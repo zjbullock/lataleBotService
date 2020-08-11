@@ -3,6 +3,7 @@ package repositories
 import (
 	"github.com/juju/loggo"
 	"lataleBotService/datasource"
+	"lataleBotService/globals"
 	"lataleBotService/models"
 	"time"
 )
@@ -14,7 +15,7 @@ type area struct {
 
 type AreasRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
-	ReadDocument(id string) (data interface{}, err error)
+	ReadDocument(id string) (area *models.Area, err error)
 	QueryDocuments(args []models.QueryArg) error
 	UpdateDocument(docId string) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
@@ -27,22 +28,61 @@ func NewAreaRepo(log loggo.Logger, ds datasource.Datasource) AreasRepository {
 	}
 }
 
-func (*area) InsertDocument(id *string, data interface{}) (*string, error) {
+func (a *area) InsertDocument(id *string, data interface{}) (*string, error) {
+	if id != nil {
+		err := a.ds.OpenConnection()
+		if err != nil {
+			a.log.Errorf("error opening connection to the datasource: %v", err)
+			return nil, err
+		}
+		defer a.ds.CloseConnection()
+		_, err = a.ds.InsertDocumentWithID(globals.AREAS, *id, data)
+		if err != nil {
+			a.log.Errorf("error Inserting Document: %v", err)
+			return nil, err
+		}
+		return id, nil
+	} else {
+		id, err := a.ds.InsertDocument(globals.AREAS, data)
+		if err != nil {
+			a.log.Errorf("error Inserting Document: %v", err)
+			return nil, err
+		}
+		return id, nil
+	}
+}
+
+func (a *area) ReadDocument(id string) (area *models.Area, err error) {
+	err = a.ds.OpenConnection()
+	if err != nil {
+		a.log.Errorf("error opening ds connection: %v", err)
+		return nil, err
+	}
+	defer a.ds.CloseConnection()
+
+	doc, err := a.ds.ReadDocument(globals.AREAS, id)
+	if err != nil {
+		a.log.Errorf("error reading user: %v", err)
+		return nil, err
+	}
+	a.log.Debugf("doc: %v", doc)
+	area = &models.Area{}
+	err = doc.DataTo(area)
+	if err != nil {
+		a.log.Errorf("error converting doc: %v", err)
+		return nil, err
+	}
+	return area, nil
+}
+
+func (a *area) QueryDocuments(args []models.QueryArg) error {
 	panic("implement me")
 }
 
-func (*area) ReadDocument(id string) (data interface{}, err error) {
+func (a *area) UpdateDocument(docId string) (*time.Time, error) {
 	panic("implement me")
 }
 
-func (*area) QueryDocuments(args []models.QueryArg) error {
-	panic("implement me")
-}
-
-func (*area) UpdateDocument(docId string) (*time.Time, error) {
-	panic("implement me")
-}
-
-func (*area) UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error) {
+func (a *area) UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error) {
 	panic("implement me")
 }

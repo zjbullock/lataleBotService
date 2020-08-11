@@ -40,8 +40,10 @@ func init() {
 	}
 	service := struct {
 		Adventure services.Adventure
+		Manage    services.Manage
 	}{
 		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, l),
+		Manage:    services.NewManageService(repos.area, repos.classes, repos.user, l),
 	}
 	handlerFuncs = &handler.Funcs{
 		Ctx: ctx,

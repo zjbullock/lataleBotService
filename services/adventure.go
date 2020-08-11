@@ -7,9 +7,8 @@ import (
 )
 
 type Adventure interface {
-	AddNewClass(class models.JobClass) (*string, error)
-	AddNewUser(user models.User) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
+	GetArea(id string) (*models.Area, error)
 }
 
 type adventure struct {
@@ -28,22 +27,13 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 	}
 }
 
-func (a *adventure) AddNewClass(class models.JobClass) (*string, error) {
-	id, err := a.classes.InsertDocument(&class.Name, class)
+func (a *adventure) GetArea(id string) (*models.Area, error) {
+	area, err := a.areas.ReadDocument(id)
 	if err != nil {
-		a.log.Errorf("error adding class: %v", err)
+		a.log.Errorf("error getting area: %v", err)
 		return nil, err
 	}
-	return id, nil
-}
-
-func (a *adventure) AddNewUser(user models.User) (*string, error) {
-	id, err := a.users.InsertDocument(&user.Name, user)
-	if err != nil {
-		a.log.Errorf("error adding user: %v", err)
-		return nil, err
-	}
-	return id, nil
+	return area, nil
 }
 
 func (a *adventure) GetBaseStat(id string) (*models.StatModifier, *string, error) {

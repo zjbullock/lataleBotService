@@ -1,3 +1,4 @@
 type Query {
     GetUserBaseStats(Id: String!): StatResponse
+    GetArea(Id: String!): AreaInfo
 }

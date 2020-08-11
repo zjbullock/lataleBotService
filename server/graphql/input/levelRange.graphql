@@ -1,0 +1,4 @@
+input LevelRange {
+    Max: Int!
+    Min: Int!
+}

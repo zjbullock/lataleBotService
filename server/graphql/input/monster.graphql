@@ -1,0 +1,6 @@
+input Monster {
+    Name: String!
+    Level: Int!
+    Exp: Int!
+    Stats: Stat!
+}

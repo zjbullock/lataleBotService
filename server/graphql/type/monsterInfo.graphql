@@ -1,0 +1,6 @@
+type MonsterInfo {
+    Name: String!
+    Level: Int!
+    Exp: Int!
+    Stats: StatInfo
+}

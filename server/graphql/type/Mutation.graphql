@@ -1,4 +1,6 @@
 type Mutation {
+    AddNewArea(area: Area!): String
+    AddNewMonster(area: String!, monster: Monster!): String
     AddNewUser(user: User!): String
     AddNewClass(class: Class!): String
 }
