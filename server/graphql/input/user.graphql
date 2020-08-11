@@ -1,0 +1,7 @@
+input User {
+    Name: String!
+    Ely: Int
+    CurrentClass: String!
+    CurrentLevel: Int
+    Classes: [ClassInfo]!
+}

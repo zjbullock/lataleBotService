@@ -1,0 +1,6 @@
+input ClassInfo {
+    Name: String!
+    Level: Int!
+    Exp: Int!
+    Equipment: Equipment!
+}

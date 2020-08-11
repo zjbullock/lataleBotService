@@ -1,0 +1,6 @@
+input Class {
+    Name: String!
+    LevelRequirement: Int!
+    Weapons: [Weapon!]!
+    Stats: Stat!
+}

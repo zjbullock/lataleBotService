@@ -3,6 +3,7 @@ package repositories
 import (
 	"github.com/juju/loggo"
 	"lataleBotService/datasource"
+	"lataleBotService/globals"
 	"lataleBotService/models"
 	"time"
 )
@@ -12,29 +13,76 @@ type user struct {
 	ds  datasource.Datasource
 }
 
-func NewUserRepo(log loggo.Logger, ds datasource.Datasource) Repository {
+type UserRepository interface {
+	InsertDocument(id *string, data interface{}) (*string, error)
+	ReadDocument(id string) (user *models.User, err error)
+	QueryDocuments(args []models.QueryArg) error
+	UpdateDocument(docId string) (*time.Time, error)
+	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
+}
+
+func NewUserRepo(log loggo.Logger, ds datasource.Datasource) UserRepository {
 	return &user{
 		log: log,
 		ds:  ds,
 	}
 }
 
-func (*user) InsertDocument(data interface{}) (*string, error) {
+func (u *user) InsertDocument(id *string, data interface{}) (*string, error) {
+	if id != nil {
+		err := u.ds.OpenConnection()
+		if err != nil {
+			u.log.Errorf("error opening connection to the datasource: %v", err)
+			return nil, err
+		}
+		defer u.ds.CloseConnection()
+		_, err = u.ds.InsertDocumentWithID(globals.USERS, *id, data)
+		if err != nil {
+			u.log.Errorf("error Inserting Document: %v", err)
+			return nil, err
+		}
+		return id, nil
+	} else {
+		id, err := u.ds.InsertDocument(globals.USERS, data)
+		if err != nil {
+			u.log.Errorf("error Inserting Document: %v", err)
+			return nil, err
+		}
+		return id, nil
+	}
+}
+
+func (u *user) ReadDocument(id string) (userInfo *models.User, err error) {
+	err = u.ds.OpenConnection()
+	if err != nil {
+		u.log.Errorf("error opening ds connection: %v", err)
+		return nil, err
+	}
+	defer u.ds.CloseConnection()
+
+	doc, err := u.ds.ReadDocument(globals.USERS, id)
+	if err != nil {
+		u.log.Errorf("error reading user: %v", err)
+		return nil, err
+	}
+	u.log.Debugf("doc: %v", doc)
+	var user models.User
+	err = doc.DataTo(&user)
+	if err != nil {
+		u.log.Errorf("error converting doc: %v", err)
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (u *user) QueryDocuments(args []models.QueryArg) error {
 	panic("implement me")
 }
 
-func (*user) ReadDocument(id string) (error) {
+func (u *user) UpdateDocument(docId string) (*time.Time, error) {
 	panic("implement me")
 }
 
-func (*user) QueryDocuments(args []models.QueryArg) (error) {
-	panic("implement me")
-}
-
-func (*user) UpdateDocument(docId string) (*time.Time, error) {
-	panic("implement me")
-}
-
-func (*user) UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error) {
+func (u *user) UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error) {
 	panic("implement me")
 }

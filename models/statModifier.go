@@ -1,6 +1,6 @@
 package models
 
-type Stat struct {
+type StatModifier struct {
 	CriticalRate           float64 `json:"criticalRate" firestore:"criticalRate"`
 	DPS                    float64 `json:"dps" firestore:"dps"`
 	CriticalDamageModifier float64 `json:"criticalDamageModifier" firestore:"criticalDamageModifier"`

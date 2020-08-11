@@ -1,0 +1,11 @@
+input Stat {
+    CriticalRate: Float!
+    DPS: Float!
+    CriticalDamageModifier: Float!
+    Defense: Float!
+    Accuracy: Float!
+    Evasion: Float!
+    HP: Float!
+    SkillProcRate: Float!
+    Recovery: Float!
+}

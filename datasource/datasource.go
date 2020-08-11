@@ -55,7 +55,8 @@ func (f *fireStoreDB) CloseConnection() error {
 }
 
 func (f *fireStoreDB) InsertDocumentWithID(collection, id string, data interface{}) (*time.Time, error) {
-	wr, err := f.Client.Doc(collection+"/"+id).Create(f.ctx, data)
+	f.log.Debugf("collection: %s, id: %s, data: %v", collection, id, data)
+	wr, err := f.Client.Doc(collection+"/"+id).Set(f.ctx, data)
 	if err != nil {
 		f.log.Errorf("error inserting document into collection: %s with error: %v", collection, err)
 		return nil, err

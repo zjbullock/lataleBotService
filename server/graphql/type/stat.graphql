@@ -1,0 +1,11 @@
+type StatInfo {
+    CriticalRate: Float!
+    DPS: Int!
+    CriticalDamageModifier: Float!
+    Defense: Int!
+    Accuracy: Float!
+    Evasion: Float!
+    HP: Int!
+    SkillProcRate: Float!
+    Recovery: Float!
+}

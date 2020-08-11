@@ -6,6 +6,7 @@ import (
 	"github.com/graph-gophers/graphql-go"
 	"github.com/juju/loggo"
 	"lataleBotService/datasource"
+	"lataleBotService/globals"
 	"lataleBotService/handler"
 	"lataleBotService/repositories"
 	"lataleBotService/resolvers"
@@ -29,18 +30,18 @@ func init() {
 		l.Criticalf("error occurred while fetching graphql schema: %v", err)
 	}
 	repos := struct {
-		area      repositories.Repository
-		character repositories.Repository
-		user      repositories.Repository
+		area    repositories.AreasRepository
+		classes repositories.ClassRepository
+		user    repositories.UserRepository
 	}{
-		area:      repositories.NewAreaRepo(l, datasource.NewDataSource(l, ctx, "")),
-		character: repositories.NewCharacterRepo(l, datasource.NewDataSource(l, ctx, "")),
-		user:      repositories.NewUserRepo(l, datasource.NewDataSource(l, ctx, "")),
+		area:    repositories.NewAreaRepo(l, datasource.NewDataSource(l, ctx, globals.PROJECTID)),
+		classes: repositories.NewClassRepo(l, datasource.NewDataSource(l, ctx, globals.PROJECTID)),
+		user:    repositories.NewUserRepo(l, datasource.NewDataSource(l, ctx, globals.PROJECTID)),
 	}
 	service := struct {
 		Adventure services.Adventure
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.character, repos.user, l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, l),
 	}
 	handlerFuncs = &handler.Funcs{
 		Ctx: ctx,
