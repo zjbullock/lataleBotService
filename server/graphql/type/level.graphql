@@ -1,0 +1,4 @@
+type Level {
+    Value: Int!
+    Exp: Int!
+}

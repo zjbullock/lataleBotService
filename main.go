@@ -20,6 +20,7 @@ var (
 	ctx          = context.Background()
 	l            loggo.Logger
 	handlerFuncs *handler.Funcs
+	ds           datasource.Datasource
 )
 
 func init() {
@@ -29,21 +30,24 @@ func init() {
 	if err != nil {
 		l.Criticalf("error occurred while fetching graphql schema: %v", err)
 	}
+	ds = datasource.NewDataSource(l, ctx, globals.PROJECTID)
 	repos := struct {
 		area    repositories.AreasRepository
 		classes repositories.ClassRepository
 		user    repositories.UserRepository
+		levels  repositories.LevelRepository
 	}{
-		area:    repositories.NewAreaRepo(l, datasource.NewDataSource(l, ctx, globals.PROJECTID)),
-		classes: repositories.NewClassRepo(l, datasource.NewDataSource(l, ctx, globals.PROJECTID)),
-		user:    repositories.NewUserRepo(l, datasource.NewDataSource(l, ctx, globals.PROJECTID)),
+		area:    repositories.NewAreaRepo(l, ds),
+		classes: repositories.NewClassRepo(l, ds),
+		user:    repositories.NewUserRepo(l, ds),
+		levels:  repositories.NewLevelRepo(l, ds),
 	}
 	service := struct {
 		Adventure services.Adventure
 		Manage    services.Manage
 	}{
 		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, l),
-		Manage:    services.NewManageService(repos.area, repos.classes, repos.user, l),
+		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, l),
 	}
 	handlerFuncs = &handler.Funcs{
 		Ctx: ctx,

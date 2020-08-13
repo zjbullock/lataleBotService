@@ -15,6 +15,19 @@ type Resolver struct {
 	Log loggo.Logger
 }
 
+func (r *Resolver) IncreaseLevelCap(ctx context.Context, args struct{ LevelCap int32 }) ([]*levelResolver, error) {
+	levelTable, err := r.Services.Manage.IncreaseLevelCap(int(args.LevelCap))
+	if err != nil {
+		r.Log.Errorf("error getting level table: %v", err)
+		return nil, err
+	}
+	var levels []*levelResolver
+	for _, level := range *levelTable {
+		levels = append(levels, &levelResolver{level: level})
+	}
+	return levels, nil
+}
+
 func (r *Resolver) AddNewMonster(ctx context.Context, args struct {
 	Area    string
 	Monster models.Monster

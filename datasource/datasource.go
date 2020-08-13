@@ -4,7 +4,9 @@ import (
 	. "cloud.google.com/go/firestore"
 	"context"
 	"github.com/juju/loggo"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"lataleBotService/models"
 	"time"
 )
 
@@ -15,6 +17,7 @@ type Datasource interface {
 	InsertDocumentWithID(collection, id string, data interface{}) (*time.Time, error)
 	UpdateDocument(collection, profileId string, data interface{}) (*time.Time, error)
 	UpdateDocumentField(collection, profileId string, updates []Update) (*time.Time, error)
+	QueryCollection(collection string, args *[]models.QueryArg) ([]*DocumentSnapshot, error)
 	ReadDocument(collection, id string) (*DocumentSnapshot, error)
 }
 
@@ -89,6 +92,37 @@ func (f *fireStoreDB) UpdateDocumentField(collection, profileId string, updates 
 		return nil, err
 	}
 	return &res.UpdateTime, nil
+}
+
+func (f *fireStoreDB) QueryCollection(collection string, args *[]models.QueryArg) ([]*DocumentSnapshot, error) {
+	var iter *DocumentIterator
+	if args != nil {
+		q := f.Client.Collection(collection).Query
+		for _, arg := range *args {
+			q = q.Where(arg.Path, arg.Op, arg.Value)
+		}
+		q.Documents(f.ctx)
+		iter = q.Documents(f.ctx)
+	} else {
+		q := f.Client.Collection(collection)
+		q.Documents(f.ctx)
+		iter = q.Documents(f.ctx)
+	}
+
+	defer iter.Stop()
+	var docs []*DocumentSnapshot
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			f.log.Errorf("error iterating through queried documents with error: %v", err)
+			return nil, err
+		}
+		docs = append(docs, doc)
+	}
+	return docs, nil
 }
 
 func (f *fireStoreDB) ReadDocument(collection, id string) (*DocumentSnapshot, error) {

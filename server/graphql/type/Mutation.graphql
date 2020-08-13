@@ -3,4 +3,5 @@ type Mutation {
     AddNewMonster(area: String!, monster: Monster!): String
     AddNewUser(user: User!): String
     AddNewClass(class: Class!): String
+    IncreaseLevelCap(levelCap: Int!): [Level]!
 }
