@@ -3,5 +3,6 @@ type MonsterInfo {
     Level: Int!
     Exp: Int!
     Ely: Int!
+    Rank: Int!
     Stats: StatInfo
 }

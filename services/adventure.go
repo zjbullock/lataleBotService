@@ -4,6 +4,7 @@ import (
 	"github.com/juju/loggo"
 	"lataleBotService/models"
 	"lataleBotService/repositories"
+	"math"
 	"strconv"
 )
 
@@ -132,8 +133,8 @@ func (a *adventure) addNewEquipmentSheet(equipSheet map[string]*models.Equipment
 func (a *adventure) calculateBaseStat(level float64, class models.StatModifier) models.StatModifier {
 	levelModifier := float64((level / 100) + 1)
 	return models.StatModifier{
-		DPS:                    getDynamicStat(10, levelModifier, level, class.DPS),
-		Defense:                getDynamicStat(10, levelModifier, level, class.Defense),
+		DPS:                    getDynamicStat(20, levelModifier, level, class.DPS),
+		Defense:                getDynamicStat(15, levelModifier, level, class.Defense),
 		HP:                     getDynamicStat(100, levelModifier, level, class.HP),
 		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery),
 		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier),
@@ -145,7 +146,7 @@ func (a *adventure) calculateBaseStat(level float64, class models.StatModifier) 
 }
 
 func getDynamicStat(baseStat, levelModifier, level, statModifier float64) float64 {
-	return baseStat * levelModifier * level * statModifier
+	return baseStat * statModifier * math.Pow(levelModifier, 7)
 }
 
 func getStaticStat(baseStat, levelModifier, statModifier float64) float64 {

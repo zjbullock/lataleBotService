@@ -5,5 +5,6 @@ type Monster struct {
 	Level int32        `json:"level" firestore:"level"`
 	Exp   int32        `json:"exp" firestore:"exp"`
 	Ely   int32        `json:"ely" firestore:"ely"`
+	Rank  int32        `json:"rank" firestore:"rank"`
 	Stats StatModifier `json:"stats" firestore:"stats"`
 }

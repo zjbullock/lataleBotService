@@ -15,7 +15,7 @@ type Manage interface {
 	AddNewUser(user models.User) (*string, *string, error)
 	AddNewClass(class models.JobClass) (*string, error)
 	AddNewArea(area models.Area) (*string, error)
-	AddNewMonster(area string, monster models.Monster) (*string, error)
+	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
 	AddNewEquipmentSheet(equipment models.EquipmentSheet) (*string, error)
 }
@@ -77,8 +77,15 @@ func (m *manage) AddNewArea(area models.Area) (*string, error) {
 	return id, nil
 }
 
-func (m *manage) AddNewMonster(area string, monster models.Monster) (*string, error) {
-	panic("implement me!")
+func (m *manage) AddNewMonster(area *models.Area, monster models.Monster) (*string, error) {
+	area.Monsters = append(area.Monsters, monster)
+	time, err := m.areas.UpdateDocument(area.Name, area)
+	if err != nil {
+		m.log.Errorf("error updating area with new monster: %v", err)
+		return nil, err
+	}
+	insertTime := time.String()
+	return &insertTime, nil
 }
 
 func (m *manage) AddNewClass(class models.JobClass) (*string, error) {

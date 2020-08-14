@@ -41,7 +41,7 @@ func (r *Resolver) AddNewMonster(ctx context.Context, args struct {
 		status := "area specified does not exist"
 		return &status, nil
 	}
-	id, err := r.Services.Manage.AddNewMonster(args.Area, args.Monster)
+	id, err := r.Services.Manage.AddNewMonster(area, args.Monster)
 	if err != nil {
 		return nil, err
 	}
