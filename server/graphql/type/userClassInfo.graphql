@@ -1,0 +1,6 @@
+type UserClassInfo {
+    Exp: Int!
+    Level: Int!
+    Name: String!
+    Equipment: EquipmentInfo!
+}

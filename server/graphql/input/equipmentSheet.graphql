@@ -1,0 +1,7 @@
+input EquipmentSheet {
+    Name: String!
+    Cost: Int!
+    ID: String!
+    LevelRequirement: Int!
+    WeaponList: [WeaponType!]!
+}

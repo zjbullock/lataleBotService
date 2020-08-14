@@ -66,10 +66,19 @@ func (r *Resolver) AddNewClass(ctx context.Context, args struct{ Class models.Jo
 	return id, nil
 }
 
-func (r *Resolver) AddNewUser(ctx context.Context, args struct{ User models.User }) (*string, error) {
-	id, err := r.Services.Manage.AddNewUser(args.User)
+func (r *Resolver) AddNewUser(ctx context.Context, args struct{ User models.User }) (*newUserResolver, error) {
+	id, message, err := r.Services.Manage.AddNewUser(args.User)
 	if err != nil {
 		r.Log.Errorf("error adding new user: %v", err)
+		return nil, err
+	}
+	return &newUserResolver{newUserResponse: models.NewUserResponse{ID: id, Message: message}}, nil
+}
+
+func (r *Resolver) AddNewEquipmentSheet(ctx context.Context, args struct{ Equipment models.EquipmentSheet }) (*string, error) {
+	id, err := r.Services.Manage.AddNewEquipmentSheet(args.Equipment)
+	if err != nil {
+		r.Log.Errorf("error adding new equipment sheet: %v", err)
 		return nil, err
 	}
 	return id, nil
@@ -82,6 +91,15 @@ func (r *Resolver) GetUserBaseStats(ctx context.Context, args struct{ Id string 
 		return nil, err
 	}
 	return &statResponseResolver{stat: &statResolver{stat: *stats}, message: message}, nil
+}
+
+func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*userResponseResolver, error) {
+	user, message, err := r.Services.Adventure.GetUserInfo(args.Id)
+	return &userResponseResolver{user: user, message: message}, err
+}
+
+func (r *Resolver) GetUserClassInfo(ctx context.Context, args struct{ Id string }) (*equipmentResolver, error) {
+	panic("Implement Me!")
 }
 
 func (r *Resolver) GetArea(ctx context.Context, args struct{ Id string }) (*areaResolver, error) {

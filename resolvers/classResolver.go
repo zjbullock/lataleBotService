@@ -2,11 +2,12 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"lataleBotService/models"
 )
 
 type classResolver struct {
-	classInfo models.ClassInfo
+	classInfo *models.ClassInfo
 }
 
 func (c *classResolver) Name(_ context.Context) string {
@@ -21,6 +22,7 @@ func (c *classResolver) Exp(_ context.Context) int32 {
 	return c.classInfo.Exp
 }
 
-func (c *classResolver) Equipment(_ context.Context) equipmentResolver {
-	return equipmentResolver{equipment: c.classInfo.Equipment}
+func (c *classResolver) Equipment(_ context.Context) *equipmentResolver {
+	fmt.Println(c.classInfo.Equipment)
+	return &equipmentResolver{equipment: &c.classInfo.Equipment}
 }

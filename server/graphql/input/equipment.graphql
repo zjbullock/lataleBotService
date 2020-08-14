@@ -1,6 +1,6 @@
 input Equipment {
-    Weapon: String
-    Body: String
-    Glove: String
-    Shoes: String
+    Weapon: Int!
+    Body: Int!
+    Glove: Int!
+    Shoes: Int!
 }

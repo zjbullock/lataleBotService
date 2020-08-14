@@ -1,0 +1,4 @@
+type UserResponse {
+    User: UserInfo
+    Message: String
+}

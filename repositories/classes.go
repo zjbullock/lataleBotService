@@ -62,7 +62,7 @@ func (c *character) ReadDocument(id string) (classInfo *models.JobClass, err err
 
 	doc, err := c.ds.ReadDocument(globals.CLASSES, id)
 	if err != nil {
-		c.log.Errorf("error reading user: %v", err)
+		c.log.Errorf("error reading classes: %v", err)
 		return nil, err
 	}
 	var class models.JobClass

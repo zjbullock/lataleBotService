@@ -2,11 +2,12 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"lataleBotService/models"
 )
 
 type userResolver struct {
-	user models.User
+	user *models.User
 }
 
 func (u *userResolver) Name(_ context.Context) string {
@@ -25,10 +26,11 @@ func (u *userResolver) CurrentLevel(_ context.Context) *int32 {
 	return u.user.CurrentLevel
 }
 
-func (u *userResolver) Classes(_ context.Context) []*classResolver {
+func (u *userResolver) Classes(_ context.Context) *[]*classResolver {
 	var classes []*classResolver
-	for _, class := range u.user.Classes {
-		classes = append(classes, &classResolver{classInfo: *class})
+	for _, class := range u.user.ClassMap {
+		classes = append(classes, &classResolver{classInfo: &class})
 	}
-	return classes
+	fmt.Println("classes: ", classes[0].classInfo.Equipment)
+	return &classes
 }

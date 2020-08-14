@@ -1,0 +1,4 @@
+input WeaponType {
+    Type: String!
+    Name: String!
+}

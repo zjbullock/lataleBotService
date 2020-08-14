@@ -1,0 +1,6 @@
+type EquipmentInfo {
+    Body: String!
+    Glove: String!
+    Shoes: String!
+    Weapon: String!
+}

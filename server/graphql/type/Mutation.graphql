@@ -1,7 +1,8 @@
 type Mutation {
     AddNewArea(area: Area!): String
     AddNewMonster(area: String!, monster: Monster!): String
-    AddNewUser(user: User!): String
+    AddNewUser(user: User!): NewUserResponse
     AddNewClass(class: Class!): String
+    AddNewEquipmentSheet(equipment: EquipmentSheet!): String
     IncreaseLevelCap(levelCap: Int!): [Level]!
 }

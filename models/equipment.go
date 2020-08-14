@@ -1,8 +1,23 @@
 package models
 
 type Equipment struct {
-	Weapon *string `json:"weapon" firestore:"weapon"`
-	Body   *string `json:"body" firestore:"body"`
-	Glove  *string `json:"glove" firestore:"glove"`
-	Shoes  *string `json:"shoes" firestore:"shoes"`
+	Weapon         int      `json:"weapon" firestore:"weapon"`
+	Body           int      `json:"body" firestore:"body"`
+	Glove          int      `json:"glove" firestore:"glove"`
+	Shoes          int      `json:"shoes" firestore:"shoes"`
+	EquipmentNames []string `json:"equipmentNames,omitempty" firestore:"equipmentNames,omitempty"`
+}
+
+type EquipmentSheet struct {
+	Name             string            `json:"name" firestore:"name,omitempty"`
+	ID               string            `json:"id" firestore:"id,omitempty"`
+	Cost             int32             `json:"cost" firestore:"cost,omitempty"`
+	LevelRequirement int32             `json:"levelRequirement" firestore:"levelRequirement,omitempty"`
+	WeaponMap        map[string]string `json:"weapon" firestore:"weapon,omitempty"`
+	WeaponList       []WeaponType
+}
+
+type WeaponType struct {
+	Type string `json:"type,omitempty"`
+	Name string `json:"name,omitempty"`
 }

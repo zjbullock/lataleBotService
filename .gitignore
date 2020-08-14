@@ -1,3 +1,4 @@
 credentials.json
 .idea/**
 vendor/
+*.exe

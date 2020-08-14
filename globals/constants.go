@@ -6,5 +6,6 @@ const (
 	AREAS     = "areas"
 	LEVELS    = "levels"
 	LEVELCAP  = "levelCap"
+	EQUIPMENT = "equipment"
 	PROJECTID = "latale-rpg"
 )
