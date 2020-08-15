@@ -1,6 +1,7 @@
 type StatInfo {
     CriticalRate: Float!
-    DPS: Int!
+    MaxDPS: Int!
+    MinDPS: Int!
     CriticalDamageModifier: Float!
     Defense: Int!
     Accuracy: Float!

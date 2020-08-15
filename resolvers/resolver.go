@@ -11,6 +11,7 @@ type Resolver struct {
 	Services struct {
 		Adventure services.Adventure
 		Manage    services.Manage
+		Damage    services.Damage
 	}
 	Log loggo.Logger
 }
@@ -109,4 +110,16 @@ func (r *Resolver) GetArea(ctx context.Context, args struct{ Id string }) (*area
 		return nil, err
 	}
 	return &areaResolver{area: *area}, nil
+}
+
+func (r *Resolver) GetAdventure(ctx context.Context, args struct {
+	AreaId string
+	UserId string
+}) (*[]string, error) {
+	adventureLog, err := r.Services.Adventure.GetAdventure(args.AreaId, args.UserId)
+	if err != nil {
+		r.Log.Errorf("error getting adventure log: %v", err)
+		return nil, err
+	}
+	return adventureLog, nil
 }

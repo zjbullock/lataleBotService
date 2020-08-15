@@ -14,8 +14,12 @@ func (s *statResolver) CriticalRate(_ context.Context) float64 {
 	return s.stat.CriticalRate
 }
 
-func (s *statResolver) DPS(_ context.Context) int32 {
-	return int32(math.Round(s.stat.DPS))
+func (s *statResolver) MaxDPS(_ context.Context) int32 {
+	return int32(math.Round(s.stat.MaxDPS))
+}
+
+func (s *statResolver) MinDPS(_ context.Context) int32 {
+	return int32(math.Round(s.stat.MinDPS))
 }
 
 func (s *statResolver) CriticalDamageModifier(_ context.Context) float64 {

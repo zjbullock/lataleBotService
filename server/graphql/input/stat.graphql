@@ -1,6 +1,7 @@
 input Stat {
     CriticalRate: Float!
-    DPS: Float!
+    MaxDPS: Float!
+    MinDPS: Float!
     CriticalDamageModifier: Float!
     Defense: Float!
     Accuracy: Float!

@@ -155,6 +155,7 @@ func (m *manage) calculateExpTable(level int) []models.Level {
 }
 
 func (m *manage) calculateExpForLevel(level int) int {
+	// 50 * (level^2) - (50 * level)
 	return 50*(int(math.Pow(float64(level), float64(2)))) - (50 * level)
 }
 

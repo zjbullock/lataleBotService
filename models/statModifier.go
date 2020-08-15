@@ -2,7 +2,8 @@ package models
 
 type StatModifier struct {
 	CriticalRate           float64 `json:"criticalRate" firestore:"criticalRate"`
-	DPS                    float64 `json:"dps" firestore:"dps"`
+	MaxDPS                 float64 `json:"maxDps" firestore:"maxDps"`
+	MinDPS                 float64 `json:"minDps" firestore:"minDps"`
 	CriticalDamageModifier float64 `json:"criticalDamageModifier" firestore:"criticalDamageModifier"`
 	Defense                float64 `json:"defense" firestore:"defense"`
 	Accuracy               float64 `json:"accuracy" firestore:"accuracy"`
