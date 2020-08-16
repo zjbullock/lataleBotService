@@ -1,5 +1,6 @@
 type UserInfo {
     Name: String!
+    ID: String!
     Ely: Int
     CurrentClass: String!
     CurrentLevel: Int

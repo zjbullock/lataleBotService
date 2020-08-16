@@ -11,7 +11,10 @@ type userResponseResolver struct {
 }
 
 func (u *userResponseResolver) User(_ context.Context) *userResolver {
-	return &userResolver{user: u.user}
+	if u.user != nil {
+		return &userResolver{user: u.user}
+	}
+	return nil
 }
 
 func (u *userResponseResolver) Message(_ context.Context) *string {

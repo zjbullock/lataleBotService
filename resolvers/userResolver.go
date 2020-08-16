@@ -14,6 +14,10 @@ func (u *userResolver) Name(_ context.Context) string {
 	return u.user.Name
 }
 
+func (u *userResolver) ID(_ context.Context) string {
+	return u.user.ID
+}
+
 func (u *userResolver) Ely(_ context.Context) *int32 {
 	return u.user.Ely
 }

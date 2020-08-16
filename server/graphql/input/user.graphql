@@ -1,5 +1,6 @@
 input User {
     Name: String!
+    ID: String!
     Ely: Int
     CurrentClass: String!
     CurrentWeapon: String!

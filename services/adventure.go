@@ -236,11 +236,19 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			break
 		}
 		userHeal := int(userStats.HP * userStats.Recovery)
-		currentHP += userHeal
+		if userHeal+currentHP > int(userStats.HP) {
+			currentHP = int(userStats.HP)
+		} else {
+			currentHP += userHeal
+		}
 		adventureLog = append(adventureLog, fmt.Sprintf("%s healed for %v HP!", user.Name, userHeal))
 		if monster.Stats.Recovery > 0.0 {
 			monsterHeal := int(monster.Stats.HP * monster.Stats.Recovery)
-			monsterHP += monsterHeal
+			if monsterHeal+monsterHP > int(monster.Stats.HP) {
+				monsterHP = int(monster.Stats.HP)
+			} else {
+				monsterHP += monsterHeal
+			}
 			adventureLog = append(adventureLog, fmt.Sprintf("%s healed for %v HP!", monster.Name, monsterHeal))
 		}
 

@@ -8,8 +8,8 @@ import (
 )
 
 type Funcs struct {
-	Ctx      context.Context
-	Schema   *graphql.Schema
+	Ctx    context.Context
+	Schema *graphql.Schema
 }
 
 func (h *Funcs) GraphQL(w http.ResponseWriter, r *http.Request) {

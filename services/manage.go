@@ -98,7 +98,7 @@ func (m *manage) AddNewClass(class models.JobClass) (*string, error) {
 }
 
 func (m *manage) AddNewUser(user models.User) (*string, *string, error) {
-	_, err := m.users.ReadDocument(user.Name)
+	_, err := m.users.ReadDocument(user.ID)
 	if err == nil {
 		s := fmt.Sprintf("user already exists")
 		return nil, &s, nil
@@ -115,7 +115,7 @@ func (m *manage) AddNewUser(user models.User) (*string, *string, error) {
 		if cleanedWeaponName == weapon.Name {
 			user.CurrentWeapon = cleanedWeaponName
 			newUser := m.generateNewUser(user, classExist.Name)
-			id, err := m.users.InsertDocument(&newUser.Name, newUser)
+			id, err := m.users.InsertDocument(&newUser.ID, newUser)
 			if err != nil {
 				m.log.Errorf("error adding user: %v", err)
 				return nil, nil, err
@@ -175,6 +175,7 @@ func (m *manage) generateNewUser(user models.User, class string) models.User {
 	ely := int32(0)
 	level := int32(1)
 	return models.User{
+		ID:            user.ID,
 		CurrentWeapon: user.CurrentWeapon,
 		CurrentClass:  strings.Title(strings.ToLower(user.CurrentClass)),
 		ClassMap:      newClass,

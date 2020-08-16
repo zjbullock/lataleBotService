@@ -2,6 +2,7 @@ package models
 
 type User struct {
 	Name          string               `json:"name" firestore:"name"`
+	ID            string               `json:"id" firestore:"id"`
 	Ely           *int32               `json:"ely" firestore:"ely"`
 	CurrentClass  string               `json:"currentClass" firestore:"currentClass"`
 	CurrentLevel  *int32               `json:"currentLevel" firestore:"currentLevel"`

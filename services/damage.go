@@ -31,7 +31,7 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 	}
 	theMonster := " "
 	if weapon != nil {
-		theMonster = "the"
+		theMonster = " the "
 	}
 	damageLog := fmt.Sprintf("%s hit%s%s ", attackerName, theMonster, defenderName)
 	damage := float64(rand.Intn(int(attacker.MaxDPS)-int(attacker.MinDPS))) + attacker.MinDPS
@@ -60,9 +60,9 @@ func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobCla
 		if currentWeapon == weapon.Name {
 			skillTier := randGenerator.Intn(100)
 			tier := 0
-			if userLevel/20 >= 3 && skillTier >= 96 {
+			if userLevel/20 >= 2 && skillTier >= 81 {
 				tier = 2
-			} else if userLevel/20 >= 2 && skillTier <= 95 && skillTier >= 60 {
+			} else if userLevel/20 >= 1 && skillTier <= 70 && skillTier >= 51 {
 				tier = 1
 			}
 			skill = weapon.Skills[tier]
