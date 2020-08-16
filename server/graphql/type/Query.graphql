@@ -1,6 +1,7 @@
 type Query {
     GetUserBaseStats(Id: String!): StatResponse
-    GetAdventure(AreaId: String!, UserId: String!): [String!]
+    GetClassInfo(Id: String!): JobClassResponse
+    GetAdventure(AreaId: String!, UserId: String!): AdventureResponse
     GetUserInfo(Id: String!): UserResponse
-    GetArea(Id: String!): AreaInfo
+    GetArea(Id: String!): AreaResponse
 }

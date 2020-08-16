@@ -1,0 +1,4 @@
+type JobClassInfo {
+    Description: String
+    LevelRequirement: Int
+}

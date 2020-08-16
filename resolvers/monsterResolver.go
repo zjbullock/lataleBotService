@@ -26,5 +26,5 @@ func (m *monsterResolver) Rank(_ context.Context) int32 {
 }
 
 func (m *monsterResolver) Stats(_ context.Context) *statResolver {
-	return &statResolver{stat: m.monsterInfo.Stats}
+	return &statResolver{stat: &m.monsterInfo.Stats}
 }

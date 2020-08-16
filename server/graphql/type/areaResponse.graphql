@@ -1,0 +1,4 @@
+type AreaResponse {
+    AreaInfo: AreaInfo
+    Message: String
+}

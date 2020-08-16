@@ -9,13 +9,15 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Adventure interface {
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
-	GetAdventure(areaId, userId string) (*[]string, error)
-	GetArea(id string) (*models.Area, error)
+	GetAdventure(areaId, userId string) (*[]string, *string, error)
+	GetJobClassDescription(id string) (*models.JobClass, error)
+	GetArea(id string) (*models.Area, *string, error)
 	GetUserInfo(id string) (*models.User, *string, error)
 }
 
@@ -39,13 +41,14 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 	}
 }
 
-func (a *adventure) GetArea(id string) (*models.Area, error) {
+func (a *adventure) GetArea(id string) (*models.Area, *string, error) {
 	area, err := a.areas.ReadDocument(id)
 	if err != nil {
 		a.log.Errorf("error getting area: %v", err)
-		return nil, err
+		message := "Unable to get area with that name!"
+		return nil, &message, err
 	}
-	return area, nil
+	return area, nil, nil
 }
 
 func (a *adventure) GetBaseStat(id string) (*models.StatModifier, *string, error) {
@@ -54,7 +57,8 @@ func (a *adventure) GetBaseStat(id string) (*models.StatModifier, *string, error
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
 		a.log.Errorf("error getting user stats: %v", err)
-		return nil, nil, err
+		message := "User has not created an account yet."
+		return nil, &message, nil
 	}
 	a.log.Debugf("user: %v", user)
 	class, err := a.classes.ReadDocument(user.CurrentClass)
@@ -65,6 +69,15 @@ func (a *adventure) GetBaseStat(id string) (*models.StatModifier, *string, error
 	//3.  Use calculateBaseStat method to get stats
 	currentStats := a.calculateBaseStat(float64(*user.CurrentLevel), class.Stats)
 	return &currentStats, nil, nil
+}
+
+func (a *adventure) GetJobClassDescription(id string) (*models.JobClass, error) {
+	jobClass, err := a.classes.ReadDocument(strings.Title(strings.ToLower(id)))
+	if err != nil {
+		a.log.Errorf("Job :%s doesn't exist.", id)
+		return nil, err
+	}
+	return jobClass, nil
 }
 
 func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
@@ -130,7 +143,7 @@ func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
 	return user, nil, nil
 }
 
-func (a *adventure) GetAdventure(areaId, userId string) (*[]string, error) {
+func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, error) {
 	/*
 		1.  Pull User Current stats
 		2.  Pull Area Monster list where -1 <= monsterLevel - userLevel <= 3
@@ -150,12 +163,14 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, error) {
 	user, err := a.users.ReadDocument(userId)
 	if err != nil {
 		a.log.Errorf("error getting user info: %v", err)
-		return nil, err
+		message := "User has not yet selected a class, or created an account"
+		return nil, &message, nil
 	}
 	area, err := a.areas.ReadDocument(areaId)
 	if err != nil {
 		a.log.Errorf("error getting area info: %v", err)
-		return nil, err
+		message := "Could not find an area with that name.  Please be sure to use the correct name."
+		return nil, &message, err
 	}
 	var monsterMap = make(map[string]*[]models.Monster)
 	for _, monster := range area.Monsters {
@@ -171,21 +186,23 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, error) {
 	monsters := a.determineMonsterRarity(monsterMap)
 	if monsters == nil {
 		afraid := fmt.Sprintf("The monsters in the %s are too afraid of fighting %s", areaId, userId)
-		return &[]string{afraid}, nil
+		return &[]string{afraid}, nil, nil
 	}
 	monster := a.determineMonster(*monsters)
 	currentStats, _, err := a.GetBaseStat(userId)
 	if err != nil {
 		a.log.Errorf("error getting user stats: %v", err)
-		return nil, err
+		message := fmt.Sprintf("Unable to get %s's base stats!", user.Name)
+		return nil, &message, err
 	}
 	classInfo, err := a.classes.ReadDocument(user.CurrentClass)
 	if err != nil {
 		a.log.Errorf("error getting user class info: %v", err)
-		return nil, err
+		message := fmt.Sprintf("Unable to get class info for %s", user.Name)
+		return nil, &message, err
 	}
 	adventureLog := a.createAdventureLog(*classInfo, user, *currentStats, monster)
-	return &adventureLog, nil
+	return &adventureLog, nil, nil
 }
 
 func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) []string {
@@ -196,7 +213,11 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	monsterHP := int(monster.Stats.HP)
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGenerator := rand.New(randSource)
-	adventureLog = append(adventureLog, fmt.Sprintf("%s has encountered a %s!", user.Name, monster.Name))
+	rankExclamation := ""
+	for i := int32(0); i < monster.Rank; i++ {
+		rankExclamation += "!"
+	}
+	adventureLog = append(adventureLog, fmt.Sprintf("%s has encountered a %s%s", user.Name, monster.Name, rankExclamation))
 	for currentHP != 0 && monsterHP != 0 {
 		userLog, damage := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, userStats, monster.Stats, &user.CurrentWeapon, &classInfo, user.CurrentLevel)
 		monsterHP = ((int(monsterHP) - int(damage)) + int(math.Abs(float64(monsterHP-damage)))) / 2

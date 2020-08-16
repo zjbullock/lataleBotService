@@ -29,7 +29,11 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 	if evasionChance > attacker.Accuracy-defender.Evasion {
 		return fmt.Sprintf("%s successfully evaded %s's attack!", defenderName, attackerName), 0
 	}
-	damageLog := fmt.Sprintf("%s hit the %s ", attackerName, defenderName)
+	theMonster := " "
+	if weapon != nil {
+		theMonster = "the"
+	}
+	damageLog := fmt.Sprintf("%s hit%s%s ", attackerName, theMonster, defenderName)
 	damage := float64(rand.Intn(int(attacker.MaxDPS)-int(attacker.MinDPS))) + attacker.MinDPS
 	criticalChance := randGenerator.Float64()
 	d.log.Debugf("%s Critical Chance: %v", attackerName, criticalChance)

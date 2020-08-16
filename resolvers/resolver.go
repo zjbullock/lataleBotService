@@ -33,18 +33,19 @@ func (r *Resolver) AddNewMonster(ctx context.Context, args struct {
 	Area    string
 	Monster models.Monster
 }) (*string, error) {
-	area, err := r.Services.Adventure.GetArea(args.Area)
+	area, _, err := r.Services.Adventure.GetArea(args.Area)
 	if err != nil {
 		r.Log.Errorf("error getting area info: %v", err)
 		return nil, err
 	}
 	if area == nil {
-		status := "area specified does not exist"
+		status := "Area specified does not exist!"
 		return &status, nil
 	}
 	id, err := r.Services.Manage.AddNewMonster(area, args.Monster)
 	if err != nil {
-		return nil, err
+		message := "Unable to add the new monster"
+		return &message, err
 	}
 	return id, err
 }
@@ -91,7 +92,7 @@ func (r *Resolver) GetUserBaseStats(ctx context.Context, args struct{ Id string 
 		r.Log.Errorf("error getting base stat: %v", err)
 		return nil, err
 	}
-	return &statResponseResolver{stat: &statResolver{stat: *stats}, message: message}, nil
+	return &statResponseResolver{stat: stats, message: message}, nil
 }
 
 func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*userResponseResolver, error) {
@@ -103,23 +104,32 @@ func (r *Resolver) GetUserClassInfo(ctx context.Context, args struct{ Id string 
 	panic("Implement Me!")
 }
 
-func (r *Resolver) GetArea(ctx context.Context, args struct{ Id string }) (*areaResolver, error) {
-	area, err := r.Services.Adventure.GetArea(args.Id)
+func (r *Resolver) GetArea(ctx context.Context, args struct{ Id string }) (*areaResponseResolver, error) {
+	area, message, err := r.Services.Adventure.GetArea(args.Id)
 	if err != nil {
 		r.Log.Errorf("error getting area: $v", err)
 		return nil, err
 	}
-	return &areaResolver{area: *area}, nil
+	return &areaResponseResolver{areaInfo: area, message: message}, nil
+}
+
+func (r *Resolver) GetClassInfo(ctx context.Context, args struct{ Id string }) (*jobClassResponseResolver, error) {
+	jobClass, err := r.Services.Adventure.GetJobClassDescription(args.Id)
+	var message string
+	if err != nil {
+		message = "Provided class does not exist!"
+	}
+	return &jobClassResponseResolver{jobClass: jobClass, message: &message}, nil
 }
 
 func (r *Resolver) GetAdventure(ctx context.Context, args struct {
 	AreaId string
 	UserId string
-}) (*[]string, error) {
-	adventureLog, err := r.Services.Adventure.GetAdventure(args.AreaId, args.UserId)
+}) (*adventureResponseResolver, error) {
+	adventureLog, message, err := r.Services.Adventure.GetAdventure(args.AreaId, args.UserId)
 	if err != nil {
 		r.Log.Errorf("error getting adventure log: %v", err)
 		return nil, err
 	}
-	return adventureLog, nil
+	return &adventureResponseResolver{log: adventureLog, message: message}, nil
 }

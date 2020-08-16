@@ -1,0 +1,4 @@
+type JobClassResponse {
+    JobClassInfo: JobClassInfo
+    Message: String
+}

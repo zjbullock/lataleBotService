@@ -5,4 +5,5 @@ type JobClass struct {
 	LevelRequirement int32        `json:"levelRequirement" firestore:"levelRequirement"`
 	Weapons          []Weapon     `json:"weapons" firestore:"weapons"`
 	Stats            StatModifier `json:"stats" firestore:"stats"`
+	Description      string       `json:"description" firestore:"description"`
 }

@@ -1,14 +1,20 @@
 package resolvers
 
-import "context"
+import (
+	"context"
+	"lataleBotService/models"
+)
 
 type statResponseResolver struct {
-	stat    *statResolver
+	stat    *models.StatModifier
 	message *string
 }
 
 func (s *statResponseResolver) Stat(_ context.Context) *statResolver {
-	return &statResolver{stat: s.stat.stat}
+	if s.stat == nil {
+		return nil
+	}
+	return &statResolver{stat: s.stat}
 }
 
 func (s *statResponseResolver) Message(_ context.Context) *string {
