@@ -13,6 +13,10 @@ func (a *areaResolver) Name(_ context.Context) string {
 	return a.area.Name
 }
 
+func (a *areaResolver) ID(_ context.Context) string {
+	return a.area.ID
+}
+
 func (a *areaResolver) LevelRange(_ context.Context) *levelRangeResolver {
 	return &levelRangeResolver{levelRange: a.area.LevelRange}
 }

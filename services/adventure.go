@@ -15,9 +15,11 @@ import (
 
 type Adventure interface {
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
+	GetJobList() (*[]models.JobClass, error)
 	GetAdventure(areaId, userId string) (*[]string, *string, error)
 	GetJobClassDescription(id string) (*models.JobClass, error)
 	GetArea(id string) (*models.Area, *string, error)
+	GetAreas() (*[]models.Area, error)
 	GetUserInfo(id string) (*models.User, *string, error)
 }
 
@@ -51,6 +53,15 @@ func (a *adventure) GetArea(id string) (*models.Area, *string, error) {
 	return area, nil, nil
 }
 
+func (a *adventure) GetAreas() (*[]models.Area, error) {
+	areaList, err := a.areas.QueryDocuments(nil)
+	if err != nil {
+		a.log.Errorf("error querying for area list: %v", err)
+		return nil, err
+	}
+	return areaList, nil
+}
+
 func (a *adventure) GetBaseStat(id string) (*models.StatModifier, *string, error) {
 	//1.  Get User Data based on ID
 	a.log.Debugf("id: %s", id)
@@ -66,8 +77,14 @@ func (a *adventure) GetBaseStat(id string) (*models.StatModifier, *string, error
 		a.log.Errorf("error reading currently selected class")
 		return nil, nil, err
 	}
+	equipmentMap, err := a.getEquipmentMap(user.ClassMap[user.CurrentClass].Equipment)
+	if err != nil {
+		a.log.Errorf("error getting equipment map: %v", err)
+		return nil, nil, err
+	}
+	a.log.Debugf("equipmentMap: %v", equipmentMap)
 	//3.  Use calculateBaseStat method to get stats
-	currentStats := a.calculateBaseStat(float64(*user.CurrentLevel), class.Stats)
+	currentStats := a.calculateBaseStat(*user, class.Stats, equipmentMap)
 	return &currentStats, nil, nil
 }
 
@@ -90,57 +107,75 @@ func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
 	}
 	a.log.Errorf("userClassMap: %v", user.ClassMap)
 	a.log.Errorf("userClassMapEquipment %v", user.ClassMap[user.CurrentClass].Equipment)
-	classEquips := user.ClassMap[user.CurrentClass].Equipment
-	a.log.Errorf("classEquips %v", classEquips)
+	for _, class := range user.ClassMap {
+		classEquips := user.ClassMap[class.Name].Equipment
+		a.log.Errorf("classEquips %v", classEquips)
+		classEquipmentMap, err := a.getEquipmentMap(classEquips)
+		if err != nil {
+			a.log.Errorf("error getting equipment map: %v", err)
+			return nil, nil, err
+		}
+		var classEquipmentList []string
+		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Body)].Name+" Hat, Shirt, and Pants")
+		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Glove)].Name+" Gloves")
+		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Shoes)].Name+" Shoes")
+		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Weapon)].WeaponMap[user.ClassMap[class.Name].CurrentWeapon])
 
+		a.log.Errorf("classEquipmentList: %v", classEquipmentList)
+		classInfo := user.ClassMap[class.Name]
+		classInfo.Equipment.EquipmentNames = classEquipmentList
+		user.ClassMap[class.Name] = classInfo
+	}
+
+	return user, nil, nil
+}
+
+func (a *adventure) getEquipmentMap(classEquips models.Equipment) (map[string]*models.EquipmentSheet, error) {
 	classEquipmentMap := make(map[string]*models.EquipmentSheet)
-	var classEquipmentList []string
 	//Determine Body
 	equipmentSheetBody, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Body))
 	if err != nil {
 		a.log.Errorf("error retrieving equipment sheet with provided equipment")
-		return nil, nil, err
+		return nil, err
 	}
 	classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetBody)
-	classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Body)].Name+" Hat, Shirt, and Pants")
 	//Determine Gloves
 	if classEquipmentMap[strconv.Itoa(classEquips.Glove)] == nil {
-		equipmentSheetBody, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Glove))
+		equipmentSheetGloves, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Glove))
 		if err != nil {
 			a.log.Errorf("error retrieving equipment sheet with provided equipment")
-			return nil, nil, err
+			return nil, err
 		}
-		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetBody)
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetGloves)
 	}
-	classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Glove)].Name+" Gloves")
 	//Determine Shoes
 	if classEquipmentMap[strconv.Itoa(classEquips.Shoes)] == nil {
-		equipmentSheetBody, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Shoes))
+		equipmentSheetShoes, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Shoes))
 		if err != nil {
 			a.log.Errorf("error retrieving equipment sheet with provided equipment")
-			return nil, nil, err
+			return nil, err
 		}
-		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetBody)
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetShoes)
 	}
-	classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Shoes)].Name+" Shoes")
 	//Determine WeaponMap
 	if classEquipmentMap[strconv.Itoa(classEquips.Weapon)] == nil {
-		equipmentSheetBody, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Weapon))
+		equipmentSheetWeapon, err := a.equipment.ReadDocument(strconv.Itoa(classEquips.Weapon))
 		if err != nil {
 			a.log.Errorf("error retrieving equipment sheet with provided equipment")
-			return nil, nil, err
+			return nil, err
 		}
-		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetBody)
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetWeapon)
 	}
-	classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Weapon)].WeaponMap[user.CurrentWeapon])
+	return classEquipmentMap, nil
+}
 
-	a.log.Errorf("classEquipmentList: %v", classEquipmentList)
-	classInfo := user.ClassMap[user.CurrentClass]
-	classInfo.Equipment.EquipmentNames = classEquipmentList
-	user.ClassMap[user.CurrentClass] = classInfo
-	a.log.Errorf("userclassMap: %v", user.ClassMap[user.CurrentClass])
-
-	return user, nil, nil
+func (a *adventure) GetJobList() (*[]models.JobClass, error) {
+	jobs, err := a.classes.QueryDocuments(nil)
+	if err != nil {
+		a.log.Errorf("error getting list of jobs: %v", err)
+		return nil, err
+	}
+	return jobs, err
 }
 
 func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, error) {
@@ -207,6 +242,7 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 
 func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) []string {
 	var adventureLog []string
+	battleWin := false
 	userMaxHP := int(userStats.HP)
 	monsterMaxHp := int(monster.Stats.HP)
 	currentHP := int(userStats.HP)
@@ -218,21 +254,24 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		rankExclamation += "!"
 	}
 	adventureLog = append(adventureLog, fmt.Sprintf("%s has encountered a %s%s", user.Name, monster.Name, rankExclamation))
+	userLevel := user.ClassMap[user.CurrentClass].Level
+	userWeapon := user.ClassMap[user.CurrentClass].CurrentWeapon
 	for currentHP != 0 && monsterHP != 0 {
-		userLog, damage := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, userStats, monster.Stats, &user.CurrentWeapon, &classInfo, user.CurrentLevel)
+		userLog, damage := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, userStats, monster.Stats, &userWeapon, &classInfo, &userLevel)
 		monsterHP = ((int(monsterHP) - int(damage)) + int(math.Abs(float64(monsterHP-damage)))) / 2
 		adventureLog = append(adventureLog, userLog)
-		adventureLog = append(adventureLog, fmt.Sprintf("%s is now at %v/%v HP!", monster.Name, monsterHP, monsterMaxHp))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", monster.Name, monsterHP, monsterMaxHp))
 		if monsterHP <= 0 {
-			adventureLog = append(adventureLog, fmt.Sprintf("%s has successfully defeated the %s!", user.Name, monster.Name))
+			adventureLog = append(adventureLog, fmt.Sprintf("**%s has successfully defeated the %s!**", user.Name, monster.Name))
+			battleWin = true
 			break
 		}
 		monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, user.Name, monster.Stats, userStats, nil, nil, nil)
 		currentHP = ((int(currentHP) - int(damage)) + int(math.Abs(float64(currentHP-damage)))) / 2
 		adventureLog = append(adventureLog, monsterLog)
-		adventureLog = append(adventureLog, fmt.Sprintf("%s is now at %v/%v HP!", user.Name, currentHP, userMaxHP))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", user.Name, currentHP, userMaxHP))
 		if currentHP <= 0 {
-			adventureLog = append(adventureLog, fmt.Sprintf("%s was killed by %s!", user.Name, monster.Name))
+			adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", user.Name, monster.Name))
 			break
 		}
 		userHeal := int(userStats.HP * userStats.Recovery)
@@ -241,7 +280,8 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		} else {
 			currentHP += userHeal
 		}
-		adventureLog = append(adventureLog, fmt.Sprintf("%s healed for %v HP!", user.Name, userHeal))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
 		if monster.Stats.Recovery > 0.0 {
 			monsterHeal := int(monster.Stats.HP * monster.Stats.Recovery)
 			if monsterHeal+monsterHP > int(monster.Stats.HP) {
@@ -249,9 +289,13 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			} else {
 				monsterHP += monsterHeal
 			}
-			adventureLog = append(adventureLog, fmt.Sprintf("%s healed for %v HP!", monster.Name, monsterHeal))
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **HEALED** for %v HP.", monster.Name, monsterHeal))
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", monster.Name, monsterHP, monsterMaxHp))
 		}
 
+	}
+	if battleWin {
+		//a.users.UpdateDocument(user.ID)
 	}
 	return adventureLog
 }
@@ -285,19 +329,20 @@ func (a *adventure) addNewEquipmentSheet(equipSheet map[string]*models.Equipment
 	return equipSheet
 }
 
-func (a *adventure) calculateBaseStat(level float64, class models.StatModifier) models.StatModifier {
+func (a *adventure) calculateBaseStat(user models.User, class models.StatModifier, equipmentMap map[string]*models.EquipmentSheet) models.StatModifier {
+	level := float64(user.ClassMap[user.CurrentClass].Level)
 	levelModifier := float64((level / 100) + 1)
 	return models.StatModifier{
-		MaxDPS:                 getDynamicStat(20, levelModifier, level, class.MaxDPS),
-		MinDPS:                 getDynamicStat(20, levelModifier, level, class.MinDPS),
-		Defense:                getDynamicStat(15, levelModifier, level, class.Defense),
+		MaxDPS:                 getDynamicStat(20, levelModifier, level, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS,
+		MinDPS:                 getDynamicStat(20, levelModifier, level, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS,
+		Defense:                getDynamicStat(15, levelModifier, level, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense,
 		HP:                     getDynamicStat(100, levelModifier, level, class.HP),
 		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery),
 		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier),
 		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate),
 		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate),
-		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion),
-		Accuracy:               getStaticStat(0.95, levelModifier, class.Accuracy),
+		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion,
+		Accuracy:               getStaticStat(0.95, levelModifier, class.Accuracy) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Glove)].GloveAccuracy,
 	}
 }
 

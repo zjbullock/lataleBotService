@@ -6,7 +6,7 @@ import (
 )
 
 type jobClassResolver struct {
-	jobClass *models.JobClass
+	jobClass models.JobClass
 }
 
 func (j *jobClassResolver) Name(_ context.Context) *string {

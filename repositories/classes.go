@@ -16,7 +16,7 @@ type character struct {
 type ClassRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
 	ReadDocument(id string) (class *models.JobClass, err error)
-	QueryDocuments(args []models.QueryArg) error
+	QueryDocuments(args *[]models.QueryArg) (*[]models.JobClass, error)
 	UpdateDocument(docId string) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
 }
@@ -74,8 +74,30 @@ func (c *character) ReadDocument(id string) (classInfo *models.JobClass, err err
 	return &class, nil
 }
 
-func (c *character) QueryDocuments(args []models.QueryArg) error {
-	panic("implement me")
+func (c *character) QueryDocuments(args *[]models.QueryArg) (*[]models.JobClass, error) {
+	err := c.ds.OpenConnection()
+	if err != nil {
+		c.log.Errorf("failed to open datasource connection")
+		return nil, err
+	}
+	defer c.ds.CloseConnection()
+	docs, err := c.ds.QueryCollection(globals.CLASSES, args)
+	if err != nil {
+		c.log.Errorf("error querying for documents with error: %v", err)
+		return nil, err
+	}
+	var jobClasses []models.JobClass
+	for _, doc := range docs {
+		job := models.JobClass{}
+		err := doc.DataTo(&job)
+		if err != nil {
+			c.log.Errorf("error converting doc to area with error: %v", err)
+			return nil, err
+		}
+		jobClasses = append(jobClasses, job)
+	}
+	c.log.Debugf("classes: %v", jobClasses)
+	return &jobClasses, nil
 }
 
 func (c *character) UpdateDocument(docId string) (*time.Time, error) {

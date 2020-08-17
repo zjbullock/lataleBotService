@@ -2,7 +2,6 @@ package resolvers
 
 import (
 	"context"
-	"fmt"
 	"lataleBotService/models"
 )
 
@@ -11,7 +10,6 @@ type equipmentResolver struct {
 }
 
 func (e *equipmentResolver) Body(_ context.Context) string {
-	fmt.Println(e.equipment.EquipmentNames)
 	return e.equipment.EquipmentNames[0]
 }
 

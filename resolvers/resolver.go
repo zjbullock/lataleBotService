@@ -68,8 +68,11 @@ func (r *Resolver) AddNewClass(ctx context.Context, args struct{ Class models.Jo
 	return id, nil
 }
 
-func (r *Resolver) AddNewUser(ctx context.Context, args struct{ User models.User }) (*newUserResolver, error) {
-	id, message, err := r.Services.Manage.AddNewUser(args.User)
+func (r *Resolver) AddNewUser(ctx context.Context, args struct {
+	User   models.User
+	Weapon string
+}) (*newUserResolver, error) {
+	id, message, err := r.Services.Manage.AddNewUser(args.User, args.Weapon)
 	if err != nil {
 		r.Log.Errorf("error adding new user: %v", err)
 		return nil, err
@@ -84,6 +87,36 @@ func (r *Resolver) AddNewEquipmentSheet(ctx context.Context, args struct{ Equipm
 		return nil, err
 	}
 	return id, nil
+}
+
+func (r *Resolver) GetAreaList(ctx context.Context) (*[]*areaResolver, error) {
+	areaList, err := r.Services.Adventure.GetAreas()
+	if err != nil {
+		r.Log.Errorf("error getting area list: %v", err)
+		return nil, err
+	}
+	if areaList == nil {
+		return nil, nil
+	}
+	var areas []*areaResolver
+	for _, area := range *areaList {
+		areas = append(areas, &areaResolver{area: area})
+	}
+	return &areas, nil
+}
+
+func (r *Resolver) GetJobList(ctx context.Context) (*[]*jobClassResolver, error) {
+	jobList, err := r.Services.Adventure.GetJobList()
+	if err != nil {
+		r.Log.Errorf("error getting job list: %v", err)
+		return nil, err
+	}
+	r.Log.Debugf("jobList: %v", jobList)
+	var jobClasses []*jobClassResolver
+	for _, job := range *jobList {
+		jobClasses = append(jobClasses, &jobClassResolver{jobClass: job})
+	}
+	return &jobClasses, nil
 }
 
 func (r *Resolver) GetUserBaseStats(ctx context.Context, args struct{ Id string }) (*statResponseResolver, error) {

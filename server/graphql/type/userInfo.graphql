@@ -3,6 +3,5 @@ type UserInfo {
     ID: String!
     Ely: Int
     CurrentClass: String!
-    CurrentLevel: Int
     Classes: [UserClassInfo]
 }

@@ -16,7 +16,7 @@ type area struct {
 type AreasRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
 	ReadDocument(id string) (area *models.Area, err error)
-	QueryDocuments(args []models.QueryArg) error
+	QueryDocuments(args *[]models.QueryArg) (*[]models.Area, error)
 	UpdateDocument(docId string, data interface{}) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
 }
@@ -75,8 +75,30 @@ func (a *area) ReadDocument(id string) (area *models.Area, err error) {
 	return area, nil
 }
 
-func (a *area) QueryDocuments(args []models.QueryArg) error {
-	panic("implement me")
+func (a *area) QueryDocuments(args *[]models.QueryArg) (*[]models.Area, error) {
+	err := a.ds.OpenConnection()
+	if err != nil {
+		a.log.Errorf("failed to open datasource connection")
+		return nil, err
+	}
+	defer a.ds.CloseConnection()
+	docs, err := a.ds.QueryCollection(globals.AREAS, args)
+	if err != nil {
+		a.log.Errorf("error querying for documents with error: %v", err)
+		return nil, err
+	}
+	var areas []models.Area
+	for _, doc := range docs {
+		area := models.Area{}
+		err := doc.DataTo(&area)
+		if err != nil {
+			a.log.Errorf("error converting doc to area with error: %v", err)
+			return nil, err
+		}
+		areas = append(areas, area)
+	}
+
+	return &areas, nil
 }
 
 func (a *area) UpdateDocument(docId string, data interface{}) (*time.Time, error) {

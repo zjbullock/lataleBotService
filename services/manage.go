@@ -12,7 +12,7 @@ import (
 )
 
 type Manage interface {
-	AddNewUser(user models.User) (*string, *string, error)
+	AddNewUser(user models.User, weapon string) (*string, *string, error)
 	AddNewClass(class models.JobClass) (*string, error)
 	AddNewArea(area models.Area) (*string, error)
 	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
@@ -69,7 +69,7 @@ func (m *manage) IncreaseLevelCap(level int) (*[]models.Level, error) {
 }
 
 func (m *manage) AddNewArea(area models.Area) (*string, error) {
-	id, err := m.areas.InsertDocument(&area.Name, area)
+	id, err := m.areas.InsertDocument(&area.ID, area)
 	if err != nil {
 		m.log.Errorf("error adding area: %v", err)
 		return nil, err
@@ -97,10 +97,10 @@ func (m *manage) AddNewClass(class models.JobClass) (*string, error) {
 	return id, nil
 }
 
-func (m *manage) AddNewUser(user models.User) (*string, *string, error) {
+func (m *manage) AddNewUser(user models.User, weapon string) (*string, *string, error) {
 	_, err := m.users.ReadDocument(user.ID)
 	if err == nil {
-		s := fmt.Sprintf("user already exists")
+		s := fmt.Sprintf("You already have an account affiliated with this bot.")
 		return nil, &s, nil
 	}
 	classExist, err := m.classes.ReadDocument(strings.Title(strings.ToLower(user.CurrentClass)))
@@ -110,11 +110,10 @@ func (m *manage) AddNewUser(user models.User) (*string, *string, error) {
 		return nil, &s, nil
 	}
 
-	cleanedWeaponName := strings.Title(strings.ToLower(user.CurrentWeapon))
+	cleanedWeaponName := strings.Title(strings.ToLower(weapon))
 	for _, weapon := range classExist.Weapons {
 		if cleanedWeaponName == weapon.Name {
-			user.CurrentWeapon = cleanedWeaponName
-			newUser := m.generateNewUser(user, classExist.Name)
+			newUser := m.generateNewUser(user, classExist.Name, cleanedWeaponName)
 			id, err := m.users.InsertDocument(&newUser.ID, newUser)
 			if err != nil {
 				m.log.Errorf("error adding user: %v", err)
@@ -159,12 +158,13 @@ func (m *manage) calculateExpForLevel(level int) int {
 	return 50*(int(math.Pow(float64(level), float64(2)))) - (50 * level)
 }
 
-func (m *manage) generateNewUser(user models.User, class string) models.User {
+func (m *manage) generateNewUser(user models.User, class, weapon string) models.User {
 	newClass := make(map[string]models.ClassInfo)
 	newClass[strings.Title(strings.ToLower(user.CurrentClass))] = models.ClassInfo{
-		Name:  class,
-		Level: 1,
-		Exp:   0,
+		Name:          class,
+		Level:         1,
+		Exp:           0,
+		CurrentWeapon: weapon,
 		Equipment: models.Equipment{
 			Weapon: 0,
 			Body:   0,
@@ -173,14 +173,11 @@ func (m *manage) generateNewUser(user models.User, class string) models.User {
 		},
 	}
 	ely := int32(0)
-	level := int32(1)
 	return models.User{
-		ID:            user.ID,
-		CurrentWeapon: user.CurrentWeapon,
-		CurrentClass:  strings.Title(strings.ToLower(user.CurrentClass)),
-		ClassMap:      newClass,
-		Ely:           &ely,
-		Name:          user.Name,
-		CurrentLevel:  &level,
+		ID:           user.ID,
+		CurrentClass: strings.Title(strings.ToLower(user.CurrentClass)),
+		ClassMap:     newClass,
+		Ely:          &ely,
+		Name:         user.Name,
 	}
 }

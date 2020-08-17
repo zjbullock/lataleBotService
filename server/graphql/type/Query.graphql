@@ -4,4 +4,6 @@ type Query {
     GetAdventure(AreaId: String!, UserId: String!): AdventureResponse
     GetUserInfo(Id: String!): UserResponse
     GetArea(Id: String!): AreaResponse
+    GetAreaList: [AreaInfo!]
+    GetJobList: [JobClassInfo]
 }

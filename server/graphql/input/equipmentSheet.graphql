@@ -3,5 +3,9 @@ input EquipmentSheet {
     Cost: Int!
     ID: String!
     LevelRequirement: Int!
+    ShoeEvasion: Float!
+    GloveAccuracy: Float!
+    ArmorDefense: Float!
+    WeaponDPS: Float!
     WeaponList: [WeaponType!]!
 }

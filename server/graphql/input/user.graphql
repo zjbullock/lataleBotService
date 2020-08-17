@@ -3,7 +3,5 @@ input User {
     ID: String!
     Ely: Int
     CurrentClass: String!
-    CurrentWeapon: String!
-    CurrentLevel: Int
     Classes: [ClassInfo]
 }

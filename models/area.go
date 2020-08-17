@@ -2,7 +2,8 @@ package models
 
 type Area struct {
 	Name       string     `json:"name" firestore:"name"`
-	LevelRange LevelRange `json:"levelRange": firestore:"levelRange"`
+	ID         string     `json:"id" firestore:"id"`
+	LevelRange LevelRange `json:"levelRange" firestore:"levelRange"`
 	Monsters   []Monster  `json:"monsters" firestore:"monsters"`
 }
 
