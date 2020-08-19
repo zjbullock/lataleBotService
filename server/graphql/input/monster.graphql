@@ -1,6 +1,7 @@
 input Monster {
     Name: String!
     Level: Int!
+    Exp: Float!
     Ely: Int!
     Rank: Int!
     Stats: Stat!

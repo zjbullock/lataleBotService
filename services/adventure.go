@@ -27,17 +27,19 @@ type adventure struct {
 	areas     repositories.AreasRepository
 	classes   repositories.ClassRepository
 	users     repositories.UserRepository
+	levels    repositories.LevelRepository
 	equipment repositories.EquipmentRepository
 	damage    Damage
 	log       loggo.Logger
 }
 
-func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, log loggo.Logger) Adventure {
+func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, log loggo.Logger) Adventure {
 	return &adventure{
 		areas:     areas,
 		classes:   classes,
 		users:     users,
 		equipment: equips,
+		levels:    levels,
 		damage:    NewDamageService(log),
 		log:       log,
 	}
@@ -236,12 +238,35 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		message := fmt.Sprintf("Unable to get class info for %s", user.Name)
 		return nil, &message, err
 	}
-	adventureLog := a.createAdventureLog(*classInfo, user, *currentStats, monster)
+	adventureLog, err := a.createAdventureLog(*classInfo, user, *currentStats, monster)
+	if err != nil {
+		a.log.Errorf("encountered error generating adventure log: %v", err)
+		return &adventureLog, nil, err
+	}
 	return &adventureLog, nil, nil
 }
 
-func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) []string {
+func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) ([]string, error) {
 	var adventureLog []string
+	lastAction := user.LastActionTime.Add(120 * time.Second)
+	if !time.Now().After(lastAction) {
+		timeDifference := lastAction.Sub(time.Now())
+		a.log.Debugf("timeDifference: %v", timeDifference)
+		minutes := 0
+		seconds := 0
+		a.log.Debugf("timeDifferenceSeconds: %v", int(timeDifference.Seconds()))
+		if int(timeDifference.Seconds()) < 60 {
+			seconds = int(timeDifference.Seconds())
+		} else {
+			for i := 60; int(timeDifference.Seconds())-i >= 0; i += 60 {
+				minutes++
+				seconds = int(timeDifference.Seconds()) - i
+			}
+		}
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ must wait **%v** ***Minutes*** and **%v** ***Seconds*** before using the adventure command again!", user.Name, minutes, seconds))
+		return adventureLog, nil
+	}
+
 	battleWin := false
 	userMaxHP := int(userStats.HP)
 	monsterMaxHp := int(monster.Stats.HP)
@@ -253,7 +278,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	for i := int32(0); i < monster.Rank; i++ {
 		rankExclamation += "!"
 	}
-	adventureLog = append(adventureLog, fmt.Sprintf("%s has encountered a %s%s", user.Name, monster.Name, rankExclamation))
+	adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has encountered a __**%s**__**%s**", user.Name, monster.Name, rankExclamation))
 	userLevel := user.ClassMap[user.CurrentClass].Level
 	userWeapon := user.ClassMap[user.CurrentClass].CurrentWeapon
 	for currentHP != 0 && monsterHP != 0 {
@@ -262,7 +287,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		adventureLog = append(adventureLog, userLog)
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", monster.Name, monsterHP, monsterMaxHp))
 		if monsterHP <= 0 {
-			adventureLog = append(adventureLog, fmt.Sprintf("**%s has successfully defeated the %s!**", user.Name, monster.Name))
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!", user.Name, monster.Name))
 			battleWin = true
 			break
 		}
@@ -295,9 +320,30 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 
 	}
 	if battleWin {
-		//a.users.UpdateDocument(user.ID)
+		userClassInfo := user.ClassMap[user.CurrentClass]
+		level, err := a.levels.ReadDocument(utils.String(userClassInfo.Level))
+		if err != nil {
+			a.log.Errorf("error getting level data: %v", err)
+			return adventureLog, err
+		}
+		userClassInfo.Exp += monster.Exp
+		*user.Ely += monster.Ely
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%v*** points of experience and ***%v*** Ely!", user.Name, monster.Exp, monster.Ely))
+		if userClassInfo.Exp >= level.Exp {
+			userClassInfo.Exp -= level.Exp
+			userClassInfo.Level++
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **LEVELED UP**!  Current Level: %v", user.Name, userClassInfo.Level))
+		}
+		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
+		user.ClassMap[user.CurrentClass] = userClassInfo
+		user.LastActionTime = time.Now()
+		_, err = a.users.UpdateDocument(user.ID, user)
+		if err != nil {
+			a.log.Errorf("failed to update user doc with error: %v", err)
+			return adventureLog, nil
+		}
 	}
-	return adventureLog
+	return adventureLog, nil
 }
 
 func (a *adventure) determineMonsterRarity(monsterMap map[string]*[]models.Monster) *[]models.Monster {

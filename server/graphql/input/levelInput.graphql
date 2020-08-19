@@ -1,0 +1,4 @@
+input LevelInput {
+    Value: Int!
+    Exp: Float!
+}

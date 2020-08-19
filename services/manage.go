@@ -17,6 +17,7 @@ type Manage interface {
 	AddNewArea(area models.Area) (*string, error)
 	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
+	CreateExpTable(levels []models.Level) (*[]models.Level, error)
 	AddNewEquipmentSheet(equipment models.EquipmentSheet) (*string, error)
 }
 
@@ -68,6 +69,40 @@ func (m *manage) IncreaseLevelCap(level int) (*[]models.Level, error) {
 	return &addedLevels, nil
 }
 
+func (m *manage) CreateExpTable(levels []models.Level) (*[]models.Level, error) {
+	currentLevels, err := m.levels.QueryDocuments(globals.LEVELS, nil)
+	if err != nil {
+		m.log.Errorf("error retrieving current levels: %v", err)
+		return nil, err
+	}
+	var addedLevels []models.Level
+	for _, level := range levels {
+		stringLevel := utils.String(level.Value)
+		m.log.Debugf("level.Val: %s", stringLevel)
+		if currentLevels[stringLevel] == nil {
+			insertedLevel, err := m.levels.InsertDocument(&stringLevel, level)
+			if err != nil {
+				m.log.Errorf("error inserting level: %v with error: %v", level.Value, err)
+				return nil, err
+			}
+			addedLevels = append(addedLevels, *insertedLevel)
+		} else {
+			_, err := m.levels.UpdateDocument(stringLevel, level)
+			if err != nil {
+				m.log.Errorf("error updating level: %v with error: %v", level.Value, err)
+				return nil, err
+			}
+			addedLevels = append(addedLevels, level)
+		}
+	}
+	_, err = m.levels.UpdateDocument(globals.LEVELCAP, levels[len(levels)-1])
+	if err != nil {
+		m.log.Errorf("error updating level cap: %v", err)
+		return nil, err
+	}
+	return &addedLevels, nil
+}
+
 func (m *manage) AddNewArea(area models.Area) (*string, error) {
 	id, err := m.areas.InsertDocument(&area.ID, area)
 	if err != nil {
@@ -106,8 +141,12 @@ func (m *manage) AddNewUser(user models.User, weapon string) (*string, *string, 
 	classExist, err := m.classes.ReadDocument(strings.Title(strings.ToLower(user.CurrentClass)))
 	if err != nil {
 		m.log.Errorf("error getting current class: %v", err)
-		s := fmt.Sprintf("Class %s does not exist, you big dumb.", user.CurrentClass)
+		s := fmt.Sprintf("The %s class does not exist.  Please select a valid class with a valid weapon", user.CurrentClass)
 		return nil, &s, nil
+	}
+	if classExist.ClassRequirement != nil {
+		message := fmt.Sprintf("Please selected a starting class.  %s is not a starting class.", classExist.Name)
+		return nil, &message, nil
 	}
 
 	cleanedWeaponName := strings.Title(strings.ToLower(weapon))
@@ -147,7 +186,7 @@ func (m *manage) calculateExpTable(level int) []models.Level {
 		if i == 1 {
 			levels = append(levels, models.Level{Value: 1, Exp: 0})
 		} else {
-			levels = append(levels, models.Level{Value: int32(i), Exp: int32(m.calculateExpForLevel(i))})
+			levels = append(levels, models.Level{Value: int32(i), Exp: float64(m.calculateExpForLevel(i))})
 		}
 	}
 	return levels
@@ -172,12 +211,12 @@ func (m *manage) generateNewUser(user models.User, class, weapon string) models.
 			Shoes:  0,
 		},
 	}
-	ely := int32(0)
+	beginnerEly := int32(0)
 	return models.User{
 		ID:           user.ID,
 		CurrentClass: strings.Title(strings.ToLower(user.CurrentClass)),
 		ClassMap:     newClass,
-		Ely:          &ely,
+		Ely:          &beginnerEly,
 		Name:         user.Name,
 	}
 }

@@ -17,7 +17,7 @@ type UserRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
 	ReadDocument(id string) (user *models.User, err error)
 	QueryDocuments(args []models.QueryArg) error
-	UpdateDocument(docId string) (*time.Time, error)
+	UpdateDocument(docId string, user *models.User) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
 }
 
@@ -79,8 +79,19 @@ func (u *user) QueryDocuments(args []models.QueryArg) error {
 	panic("implement me")
 }
 
-func (u *user) UpdateDocument(docId string) (*time.Time, error) {
-	panic("implement me")
+func (u *user) UpdateDocument(docId string, user *models.User) (*time.Time, error) {
+	err := u.ds.OpenConnection()
+	if err != nil {
+		u.log.Errorf("failed to open datasource connection")
+		return nil, err
+	}
+	defer u.ds.CloseConnection()
+	updateTS, err := u.ds.UpdateDocument(globals.USERS, docId, user)
+	if err != nil {
+		u.log.Errorf("failed to update doc: %s with data: %v.  Received err: %v", docId, user, err)
+		return nil, err
+	}
+	return updateTS, nil
 }
 
 func (u *user) UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error) {

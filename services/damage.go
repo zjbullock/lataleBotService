@@ -26,7 +26,15 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 
 	evasionChance := randGenerator.Float64()
 	d.log.Debugf("%s Evasion Chance: %v", defenderName, evasionChance)
-	if evasionChance > attacker.Accuracy-defender.Evasion {
+	accuracy := attacker.Accuracy
+	if accuracy > 1.0 {
+		accuracy = 1.0
+	}
+	evasion := defender.Evasion
+	if evasion > 1.0 {
+		evasion = 1.0
+	}
+	if evasionChance > accuracy-evasion {
 		return fmt.Sprintf("%s successfully ***EVADED*** %s's attack!", defenderName, attackerName), 0
 	}
 	theMonster := " "
@@ -35,12 +43,6 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 	}
 	damageLog := fmt.Sprintf("__**%s**__ hit%s__**%s**__ ", attackerName, theMonster, defenderName)
 	damage := float64(rand.Intn(int(attacker.MaxDPS)-int(attacker.MinDPS))) + attacker.MinDPS
-	criticalChance := randGenerator.Float64()
-	d.log.Debugf("%s Critical Chance: %v", attackerName, criticalChance)
-	if attacker.CriticalRate != 0.0 && criticalChance <= attacker.CriticalRate {
-		damage = damage * attacker.CriticalDamageModifier
-		damageLog += "***CRITICALLY*** "
-	}
 	skillChance := randGenerator.Float64()
 	d.log.Debugf("%s Skill Chance: %v", attackerName, skillChance)
 	if attacker.SkillProcRate != 0.0 && skillChance <= attacker.SkillProcRate {
@@ -49,7 +51,17 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 		damageLog += fmt.Sprintf("with the skill ***%s*** ", skillName)
 	}
 	roundedDamage := ((int(damage) - int(defender.Defense)) + int(math.Abs(damage-defender.Defense))) / 2
-	damageLog += fmt.Sprintf("for **%v** damage!", roundedDamage)
+
+	criticalChance := randGenerator.Float64()
+	d.log.Debugf("%s Critical Chance: %v", attackerName, criticalChance)
+	damageLog += fmt.Sprintf("for ")
+	if attacker.CriticalRate != 0.0 && criticalChance <= attacker.CriticalRate {
+		roundedDamage = int(float64(roundedDamage) * attacker.CriticalDamageModifier)
+		damageLog += fmt.Sprintf("**%v** ***CRITICAL*** damage!", roundedDamage)
+	} else {
+		damageLog += fmt.Sprintf("**%v** damage!", roundedDamage)
+	}
+
 	return damageLog, roundedDamage
 }
 

@@ -54,7 +54,26 @@ func (l *level) InsertDocument(id *string, level models.Level) (*models.Level, e
 }
 
 func (l *level) ReadDocument(id string) (level *models.Level, err error) {
-	panic("implement me")
+	err = l.ds.OpenConnection()
+	if err != nil {
+		l.log.Errorf("error opening ds connection: %v", err)
+		return nil, err
+	}
+	defer l.ds.CloseConnection()
+
+	doc, err := l.ds.ReadDocument(globals.LEVELS, id)
+	if err != nil {
+		l.log.Errorf("error reading level: %v", err)
+		return nil, err
+	}
+	l.log.Debugf("doc: %v", doc)
+	level = &models.Level{}
+	err = doc.DataTo(level)
+	if err != nil {
+		l.log.Errorf("error converting doc: %v", err)
+		return nil, err
+	}
+	return level, nil
 }
 
 func (l *level) QueryDocuments(collection string, args *[]models.QueryArg) (map[string]*models.Level, error) {

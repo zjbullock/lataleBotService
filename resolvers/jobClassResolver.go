@@ -17,6 +17,10 @@ func (j *jobClassResolver) LevelRequirement(_ context.Context) *int32 {
 	return &j.jobClass.LevelRequirement
 }
 
+func (j *jobClassResolver) ClassRequirement(_ context.Context) *string {
+	return j.jobClass.ClassRequirement
+}
+
 func (j *jobClassResolver) Weapons(_ context.Context) *[]models.Weapon {
 	return &j.jobClass.Weapons
 }

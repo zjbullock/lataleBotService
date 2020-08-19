@@ -1,5 +1,5 @@
 type UserClassInfo {
-    Exp: Int!
+    Exp: Float!
     Level: Int!
     Name: String!
     Equipment: EquipmentInfo!

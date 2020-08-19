@@ -29,6 +29,19 @@ func (r *Resolver) IncreaseLevelCap(ctx context.Context, args struct{ LevelCap i
 	return levels, nil
 }
 
+func (r *Resolver) AddLevelTable(ctx context.Context, args struct{ Levels []models.Level }) ([]*levelResolver, error) {
+	levelTable, err := r.Services.Manage.CreateExpTable(args.Levels)
+	if err != nil {
+		r.Log.Errorf("error getting level table: %v", err)
+		return nil, err
+	}
+	var levels []*levelResolver
+	for _, level := range *levelTable {
+		levels = append(levels, &levelResolver{level: level})
+	}
+	return levels, nil
+}
+
 func (r *Resolver) AddNewMonster(ctx context.Context, args struct {
 	Area    string
 	Monster models.Monster
@@ -114,7 +127,9 @@ func (r *Resolver) GetJobList(ctx context.Context) (*[]*jobClassResolver, error)
 	r.Log.Debugf("jobList: %v", jobList)
 	var jobClasses []*jobClassResolver
 	for _, job := range *jobList {
-		jobClasses = append(jobClasses, &jobClassResolver{jobClass: job})
+		if job.ClassRequirement == nil {
+			jobClasses = append(jobClasses, &jobClassResolver{jobClass: job})
+		}
 	}
 	return &jobClasses, nil
 }

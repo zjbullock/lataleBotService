@@ -49,7 +49,7 @@ func init() {
 		Manage    services.Manage
 		Damage    services.Damage
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, l),
 		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, l),
 		Damage:    services.NewDamageService(l),
 	}
