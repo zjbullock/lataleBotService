@@ -440,7 +440,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
 		user.ClassMap[user.CurrentClass] = userClassInfo
 	}
-	//user.LastActionTime = time.Now()
+	user.LastActionTime = time.Now()
 	_, err = a.users.UpdateDocument(user.ID, user)
 	if err != nil {
 		a.log.Errorf("failed to update user doc with error: %v", err)
