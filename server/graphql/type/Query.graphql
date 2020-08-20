@@ -1,9 +1,10 @@
 type Query {
-    GetUserBaseStats(Id: String!): StatResponse
-    GetClassInfo(Id: String!): JobClassResponse
-    GetAdventure(AreaId: String!, UserId: String!): AdventureResponse
-    GetUserInfo(Id: String!): UserResponse
-    GetArea(Id: String!): AreaResponse
+    GetUserBaseStats(id: String!): StatResponse
+    GetClassInfo(id: String!): JobClassResponse
+    GetAdventure(areaId: String!, userId: String!): AdventureResponse
+    GetUpgradeCost(id: String!, equipment: String!): String
+    GetUserInfo(id: String!): UserResponse
+    GetArea(id: String!): AreaResponse
     GetAreaList: [AreaInfo!]
     GetJobList: [JobClassInfo]
 }

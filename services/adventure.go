@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/juju/loggo"
 	"lataleBotService/models"
@@ -14,6 +15,8 @@ import (
 )
 
 type Adventure interface {
+	UpdateEquipmentPiece(id, equipment string) (*string, error)
+	GetEquipmentPieceCost(id, equipment string) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
 	GetJobList() (*[]models.JobClass, error)
 	GetAdventure(areaId, userId string) (*[]string, *string, error)
@@ -97,6 +100,101 @@ func (a *adventure) GetJobClassDescription(id string) (*models.JobClass, error) 
 		return nil, err
 	}
 	return jobClass, nil
+}
+
+func (a *adventure) UpdateEquipmentPiece(id, equipment string) (*string, error) {
+	//1.  Get User Info
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		return nil, err
+	}
+	//2.  Based on equipment piece, pass current gear level to ProcessUpgrade
+	message, err := a.processUpgrade(user, strings.ToLower(equipment))
+	if err != nil {
+		a.log.Errorf("error processing upgrade: %v", err)
+		return nil, err
+	}
+	return message, nil
+}
+
+func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		return nil, err
+	}
+	var equipmentInterface map[string]interface{}
+	equips := user.ClassMap[user.CurrentClass].Equipment
+	bytes, _ := json.Marshal(&equips)
+	json.Unmarshal(bytes, &equipmentInterface)
+	equip := equipmentInterface[equipment]
+	a.log.Debugf("equips :%v", equip)
+	if equip == nil {
+		message := fmt.Sprintf("%s is not a valid piece of equipment!", equipment)
+		return &message, nil
+	}
+	equipSheet, err := a.equipment.ReadDocument(fmt.Sprintf("%1.f", equip.(float64)+1.0))
+	if err != nil {
+		a.log.Errorf("error retrieving equipment sheet with error: %v", err)
+		message := fmt.Sprintf("No further %s upgrades available at this time!", equipment)
+		return &message, nil
+	}
+	message := fmt.Sprintf("The cost of upgrading your %s is %s ely.", equipment, utils.String(equipSheet.Cost))
+	return &message, nil
+}
+
+func (a *adventure) processUpgrade(user *models.User, equipment string) (*string, error) {
+	var equipmentInterface map[string]interface{}
+	equips := user.ClassMap[user.CurrentClass].Equipment
+	bytes, _ := json.Marshal(&equips)
+	json.Unmarshal(bytes, &equipmentInterface)
+	equip := equipmentInterface[equipment]
+	a.log.Debugf("equips :%v", equip)
+	if equip == nil {
+		message := fmt.Sprintf("%s is not a valid piece of equipment!", equipment)
+		return &message, nil
+	}
+
+	//3.  Check if an upgrade is available.  If no doc found, gear does not exist, or something happened.
+	equipSheet, err := a.equipment.ReadDocument(fmt.Sprintf("%1.f", equip.(float64)+1.0))
+	if err != nil {
+		a.log.Errorf("error retrieving equipment sheet with error: %v", err)
+		message := fmt.Sprintf("No further %s upgrades available at this time!", equipment)
+		return &message, nil
+	}
+
+	currentEquipSheet, err := a.equipment.ReadDocument(fmt.Sprintf("%1.f", equip.(float64)))
+	if err != nil {
+		a.log.Errorf("error retrieving equipment sheet with error: %v", err)
+		return nil, err
+	}
+	//If the cost is met, decrease user ely by cost, and upgrade specified piece of equipment.
+
+	s := ""
+	if *user.Ely >= equipSheet.Cost {
+		currentValue := equipmentInterface[equipment].(float64)
+		currentValue++
+		equipmentInterface[equipment] = currentValue
+		bytes, _ = json.Marshal(&equipmentInterface)
+		var newEquips models.Equipment
+		json.Unmarshal(bytes, &newEquips)
+		a.log.Debugf("newEquips :%v", newEquips)
+		userClass := user.ClassMap[user.CurrentClass]
+		userClass.Equipment = newEquips
+		ely := *user.Ely
+		ely -= equipSheet.Cost
+		user.Ely = &ely
+		user.ClassMap[user.CurrentClass] = userClass
+		_, err := a.users.UpdateDocument(user.ID, user)
+		if err != nil {
+			a.log.Errorf("error updating user document: %v", err)
+			return nil, err
+		}
+		s = fmt.Sprintf("Successfully upgraded %s from %s to %s!", equipment, currentEquipSheet.Name, equipSheet.Name)
+	} else {
+		s = fmt.Sprintf("Insufficient Ely!  You need %v more Ely to complete this upgrade.", equipSheet.Cost-*user.Ely)
+		return &s, nil
+	}
+	return &s, nil
 }
 
 func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
@@ -319,7 +417,12 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		}
 
 	}
-	if battleWin {
+	levelCap, err := a.levels.ReadDocument("levelCap")
+	if err != nil {
+		a.log.Errorf("error retrieving current levelCap: %v", err)
+		return nil, err
+	}
+	if battleWin && levelCap.Value != user.ClassMap[user.CurrentClass].Level {
 		userClassInfo := user.ClassMap[user.CurrentClass]
 		level, err := a.levels.ReadDocument(utils.String(userClassInfo.Level))
 		if err != nil {
@@ -336,12 +439,12 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		}
 		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
 		user.ClassMap[user.CurrentClass] = userClassInfo
-		user.LastActionTime = time.Now()
-		_, err = a.users.UpdateDocument(user.ID, user)
-		if err != nil {
-			a.log.Errorf("failed to update user doc with error: %v", err)
-			return adventureLog, nil
-		}
+	}
+	//user.LastActionTime = time.Now()
+	_, err = a.users.UpdateDocument(user.ID, user)
+	if err != nil {
+		a.log.Errorf("failed to update user doc with error: %v", err)
+		return adventureLog, nil
 	}
 	return adventureLog, nil
 }

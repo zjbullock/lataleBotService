@@ -6,4 +6,5 @@ type Mutation {
     AddNewEquipmentSheet(equipment: EquipmentSheet!): String
     IncreaseLevelCap(levelCap: Int!): [Level]!
     AddLevelTable(levels: [LevelInput!]!): [Level]!
+    UpgradeEquipment(id: String!, equipment: String!): String
 }

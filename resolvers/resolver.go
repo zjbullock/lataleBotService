@@ -5,6 +5,7 @@ import (
 	"github.com/juju/loggo"
 	"lataleBotService/models"
 	"lataleBotService/services"
+	"strconv"
 )
 
 type Resolver struct {
@@ -113,7 +114,14 @@ func (r *Resolver) GetAreaList(ctx context.Context) (*[]*areaResolver, error) {
 	}
 	var areas []*areaResolver
 	for _, area := range *areaList {
-		areas = append(areas, &areaResolver{area: area})
+		intValue, err := strconv.ParseInt(area.ID, 10, 32)
+		if err != nil {
+			r.Log.Errorf("error parsing int from input ID")
+			return nil, err
+		}
+		if intValue < 1000 {
+			areas = append(areas, &areaResolver{area: area})
+		}
 	}
 	return &areas, nil
 }
@@ -150,6 +158,31 @@ func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*
 
 func (r *Resolver) GetUserClassInfo(ctx context.Context, args struct{ Id string }) (*equipmentResolver, error) {
 	panic("Implement Me!")
+}
+
+func (r *Resolver) UpgradeEquipment(ctx context.Context, args struct {
+	Id        string
+	Equipment string
+}) (*string, error) {
+	msg, err := r.Services.Adventure.UpdateEquipmentPiece(args.Id, args.Equipment)
+	if err != nil {
+		r.Log.Errorf("error updating equipment piece: %v", err)
+		return nil, err
+	}
+	return msg, nil
+}
+
+func (r *Resolver) GetUpgradeCost(ctx context.Context, args struct {
+	Id        string
+	Equipment string
+}) (*string, error) {
+	message, err := r.Services.Adventure.GetEquipmentPieceCost(args.Id, args.Equipment)
+	if err != nil {
+		r.Log.Errorf("error getting equipment cost: %v", err)
+		return nil, err
+	}
+
+	return message, nil
 }
 
 func (r *Resolver) GetArea(ctx context.Context, args struct{ Id string }) (*areaResponseResolver, error) {
