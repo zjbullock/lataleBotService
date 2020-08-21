@@ -132,13 +132,41 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		message := fmt.Sprintf("%s is not a valid piece of equipment!", equipment)
 		return &message, nil
 	}
+	oldEquipSheet, err := a.equipment.ReadDocument(fmt.Sprintf("%1.f", equip.(float64)))
+	if err != nil {
+		a.log.Errorf("error retrieving equipment sheet with error: %v", err)
+		message := fmt.Sprintf("No further %s upgrades available at this time!", equipment)
+		return &message, nil
+	}
 	equipSheet, err := a.equipment.ReadDocument(fmt.Sprintf("%1.f", equip.(float64)+1.0))
 	if err != nil {
 		a.log.Errorf("error retrieving equipment sheet with error: %v", err)
 		message := fmt.Sprintf("No further %s upgrades available at this time!", equipment)
 		return &message, nil
 	}
-	message := fmt.Sprintf("The cost of upgrading your %s is %s ely.", equipment, utils.String(equipSheet.Cost))
+	message := fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
+	switch equipment {
+	case "weapon":
+		message += fmt.Sprintf("Damage gained from weapon: **%1.f** -> **%1.f**\n", oldEquipSheet.WeaponDPS, equipSheet.WeaponDPS)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "shoes":
+		oldShoeEvasion := strconv.FormatFloat(oldEquipSheet.ShoeEvasion*100.0, 'f', -1, 64)
+		shoeEvasion := strconv.FormatFloat(equipSheet.ShoeEvasion*100.0, 'f', -1, 64)
+		message += fmt.Sprintf("Evasion gained from shoes: **%s%%** -> **%s%%**\n", oldShoeEvasion, shoeEvasion)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "glove":
+		oldGloveAccuracy := strconv.FormatFloat(oldEquipSheet.GloveAccuracy*100.0, 'f', -1, 64)
+		gloveAccuracy := strconv.FormatFloat(equipSheet.GloveAccuracy*100.0, 'f', -1, 64)
+		oldGloveCritDamage := strconv.FormatFloat(oldEquipSheet.GloveCriticalDamage*100.0, 'f', -1, 64)
+		gloveCritDamage := strconv.FormatFloat(equipSheet.GloveCriticalDamage*100.0, 'f', -1, 64)
+
+		message += fmt.Sprintf("Accuracy gained from gloves: **%s%%** -> **%s%%**\n", oldGloveAccuracy, gloveAccuracy)
+		message += fmt.Sprintf("Critical Damage gained from gloves: **%s%%** -> **%s%%**\n", oldGloveCritDamage, gloveCritDamage)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "body":
+		message += fmt.Sprintf("Defense gained from body armor: **%1.f** -> **%1.f**\n", oldEquipSheet.ArmorDefense, equipSheet.ArmorDefense)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	}
 	return &message, nil
 }
 
@@ -159,6 +187,11 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 	if err != nil {
 		a.log.Errorf("error retrieving equipment sheet with error: %v", err)
 		message := fmt.Sprintf("No further %s upgrades available at this time!", equipment)
+		return &message, nil
+	}
+
+	if equipSheet.LevelRequirement > user.ClassMap[user.CurrentClass].Level {
+		message := fmt.Sprintf("You do not meet the level requirement to upgrade this piece of gear!  Required Level: %v", equipSheet.LevelRequirement)
 		return &message, nil
 	}
 
@@ -436,8 +469,9 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			userClassInfo.Exp -= level.Exp
 			userClassInfo.Level++
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **LEVELED UP**!  Current Level: %v", user.Name, userClassInfo.Level))
+		} else {
+			adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
 		}
-		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
 		user.ClassMap[user.CurrentClass] = userClassInfo
 	}
 	user.LastActionTime = time.Now()
@@ -487,7 +521,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		Defense:                getDynamicStat(15, levelModifier, level, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense,
 		HP:                     getDynamicStat(100, levelModifier, level, class.HP),
 		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery),
-		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier),
+		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].GloveCriticalDamage,
 		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate),
 		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate),
 		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion,

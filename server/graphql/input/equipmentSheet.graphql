@@ -5,6 +5,7 @@ input EquipmentSheet {
     LevelRequirement: Int!
     ShoeEvasion: Float!
     GloveAccuracy: Float!
+    GloveCriticalDamage: Float!
     ArmorDefense: Float!
     WeaponDPS: Float!
     WeaponList: [WeaponType!]!
