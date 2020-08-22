@@ -265,32 +265,50 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		return &message, nil
 	}
 
-	message := fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
+	message := ""
 	switch equipment {
 	case "bindi":
-		message += fmt.Sprintf("HP gained from bindi: **%1.f** -> **%1.f**\n", oldEquipSheet.BindiHP, equipSheet.BindiHP)
+		oldBindi := strconv.FormatFloat(oldEquipSheet.BindiHP, 'f', -1, 64)
+		bindi := strconv.FormatFloat(equipSheet.BindiHP, 'f', -1, 64)
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
+		message += fmt.Sprintf("HP gained from bindi: **%s** -> **%s**\n", oldBindi, bindi)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "glasses":
-		message += fmt.Sprintf("Critical Damage gained from glasses: **%1.f** -> **%1.f**\n", oldEquipSheet.GlassesCritDamage, equipSheet.GlassesCritDamage)
+		oldGlasses := strconv.FormatFloat(oldEquipSheet.GlassesCritDamage*100.0, 'f', -1, 64)
+		glasses := strconv.FormatFloat(equipSheet.GlassesCritDamage*100.0, 'f', -1, 64)
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
+		message += fmt.Sprintf("Critical Damage gained from glasses: **%s%%** -> **%s%%**\n", oldGlasses, glasses)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "earrings":
-		message += fmt.Sprintf("Critical Rate gained from earrings: **%1.f** -> **%1.f**\n", oldEquipSheet.EarringCritRate, equipSheet.EarringCritRate)
+		oldEarrings := strconv.FormatFloat(oldEquipSheet.EarringCritRate*100.0, 'f', -1, 64)
+		earrings := strconv.FormatFloat(equipSheet.EarringCritRate*100.0, 'f', -1, 64)
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
+		message += fmt.Sprintf("Critical Rate gained from earrings: **%s%%** -> **%s%%**\n", oldEarrings, earrings)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "ring":
-		message += fmt.Sprintf("Critical Rate gained from ring: **%1.f** -> **%1.f**\n", oldEquipSheet.RingCritRate, equipSheet.RingCritRate)
+		oldRing := strconv.FormatFloat(oldEquipSheet.RingCritRate*100.0, 'f', -1, 64)
+		ring := strconv.FormatFloat(equipSheet.RingCritRate*100.0, 'f', -1, 64)
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
+		message += fmt.Sprintf("Critical Rate gained from ring: **%s%%** -> **%s%%**\n", oldRing, ring)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "mantle":
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
 		message += fmt.Sprintf("Damage gained from mantle: **%1.f** -> **%1.f**\n", oldEquipSheet.MantleDamage, equipSheet.MantleDamage)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "stockings":
-		message += fmt.Sprintf("Evasion gained from stockings: **%1.f** -> **%1.f**\n", oldEquipSheet.StockingEvasion, equipSheet.StockingEvasion)
+		oldStockingsEvasion := strconv.FormatFloat(oldEquipSheet.StockingEvasion*100.0, 'f', -1, 64)
+		stockingEvasion := strconv.FormatFloat(equipSheet.StockingEvasion*100.0, 'f', -1, 64)
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
+		message += fmt.Sprintf("Evasion gained from stockings: **%s%%** -> **%s%%**\n", oldStockingsEvasion, stockingEvasion)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "weapon":
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 		message += fmt.Sprintf("Damage gained from weapon: **%1.f** -> **%1.f**\n", oldEquipSheet.WeaponDPS, equipSheet.WeaponDPS)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "shoe", "shoes":
 		oldShoeEvasion := strconv.FormatFloat(oldEquipSheet.ShoeEvasion*100.0, 'f', -1, 64)
 		shoeEvasion := strconv.FormatFloat(equipSheet.ShoeEvasion*100.0, 'f', -1, 64)
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 		message += fmt.Sprintf("Evasion gained from shoes: **%s%%** -> **%s%%**\n", oldShoeEvasion, shoeEvasion)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "glove", "gloves":
@@ -298,11 +316,12 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		gloveAccuracy := strconv.FormatFloat(equipSheet.GloveAccuracy*100.0, 'f', -1, 64)
 		oldGloveCritDamage := strconv.FormatFloat(oldEquipSheet.GloveCriticalDamage*100.0, 'f', -1, 64)
 		gloveCritDamage := strconv.FormatFloat(equipSheet.GloveCriticalDamage*100.0, 'f', -1, 64)
-
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 		message += fmt.Sprintf("Accuracy gained from gloves: **%s%%** -> **%s%%**\n", oldGloveAccuracy, gloveAccuracy)
 		message += fmt.Sprintf("Critical Damage gained from gloves: **%s%%** -> **%s%%**\n", oldGloveCritDamage, gloveCritDamage)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "body":
+		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 		message += fmt.Sprintf("Defense gained from body armor: **%1.f** -> **%1.f**\n", oldEquipSheet.ArmorDefense, equipSheet.ArmorDefense)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	}
@@ -312,6 +331,8 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 func (a *adventure) processUpgrade(user *models.User, equipment string) (*string, error) {
 	var equipmentInterface map[string]interface{}
 	equips := user.ClassMap[user.CurrentClass].Equipment
+	a.log.Debugf("equipment: %v", equipment)
+	a.log.Debugf("equips: %v", *equips.Earring)
 	bytes, _ := json.Marshal(&equips)
 	json.Unmarshal(bytes, &equipmentInterface)
 	equip := equipmentInterface[equipment]
@@ -351,7 +372,15 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 	//If the cost is met, decrease user ely by cost, and upgrade specified piece of equipment.
 
 	s := ""
-	if *user.Ely >= equipSheet.Cost {
+	cost := int32(0)
+	switch equipment {
+	case "glove", "gloves", "body", "shoe", "shoes", "weapon":
+		cost = equipSheet.Cost
+		break
+	default:
+		cost = equipSheet.AccessoryCost
+	}
+	if *user.Ely >= cost {
 		currentValue := equipmentInterface[equipment].(float64)
 		currentValue++
 		equipmentInterface[equipment] = currentValue
@@ -362,7 +391,7 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 		userClass := user.ClassMap[user.CurrentClass]
 		userClass.Equipment = newEquips
 		ely := *user.Ely
-		ely -= equipSheet.Cost
+		ely -= cost
 		user.Ely = &ely
 		user.ClassMap[user.CurrentClass] = userClass
 		_, err := a.users.UpdateDocument(user.ID, user)
@@ -376,7 +405,7 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 			s = fmt.Sprintf("Successfully upgraded %s from %s to %s!", equipment, currentEquipSheet.Name, equipSheet.Name)
 		}
 	} else {
-		s = fmt.Sprintf("Insufficient Ely!  You need %v more Ely to complete this upgrade.", equipSheet.Cost-*user.Ely)
+		s = fmt.Sprintf("Insufficient Ely!  You need %v more Ely to complete this upgrade.", cost-*user.Ely)
 		return &s, nil
 	}
 	return &s, nil
@@ -573,8 +602,17 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 	area, err := a.areas.ReadDocument(areaId)
 	if err != nil {
 		a.log.Errorf("error getting area info: %v", err)
-		message := "Could not find an area with that name.  Please be sure to use the correct name."
-		return nil, &message, err
+		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
+		return nil, &message, nil
+	}
+	levelCap, err := a.levels.ReadDocument("levelCap")
+	if err != nil {
+		a.log.Errorf("error getting current level cap: %v", err)
+		return nil, nil, err
+	}
+	if levelCap.Value < area.LevelRange.Min {
+		levelRestriction := fmt.Sprintf("Area %v is currently inaccessible due to level cap restrictions!", areaId)
+		return &[]string{levelRestriction}, nil, nil
 	}
 	var monsterMap = make(map[string]*[]models.Monster)
 	for _, monster := range area.Monsters {
@@ -696,7 +734,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		userClassInfo.Exp += monster.Exp
 		*user.Ely += monster.Ely
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.Name, strconv.FormatFloat(monster.Exp, 'f', -1, 64), monster.Ely))
-		userClassInfo, adventureLog, err = a.processLevelUps(userClassInfo, adventureLog, user)
+		userClassInfo, adventureLog, err = a.processLevelUps(userClassInfo, adventureLog, user, levelCap.Value)
 		if err != nil {
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
@@ -715,7 +753,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	return adventureLog, nil
 }
 
-func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User) (models.ClassInfo, []string, error) {
+func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int32) (models.ClassInfo, []string, error) {
 	level, err := a.levels.ReadDocument(utils.String(userClassInfo.Level))
 	if err != nil {
 		a.log.Errorf("error getting level data: %v", err)
@@ -725,7 +763,24 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 		userClassInfo.Exp -= level.Exp
 		userClassInfo.Level++
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **LEVELED UP**!  Current Level: %v", user.Name, userClassInfo.Level))
-		return a.processLevelUps(userClassInfo, adventureLog, user)
+		if userClassInfo.Level == 50 {
+
+			advanceJobs, err := a.classes.QueryDocuments(&[]models.QueryArg{{Path: "classRequirement", Op: "==", Value: user.CurrentClass}})
+			if err != nil {
+				a.log.Errorf("error querying for 2nd tier classes")
+				return userClassInfo, adventureLog, err
+			}
+			possibleJobs := *advanceJobs
+			if advanceJobs != nil {
+				adventureLog = append(adventureLog, fmt.Sprintf("Congratulations!  Now that you've reached level 50, you may use the **-classAdvance <Class> <Weapon>** command to advance to either ***%s*** or ***%s***", possibleJobs[0].Name, possibleJobs[1].Name))
+			}
+		}
+		if levelCap == userClassInfo.Level {
+			userClassInfo.Exp = 0.0
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ** has reached the level cap!**", user.Name))
+			return userClassInfo, adventureLog, nil
+		}
+		return a.processLevelUps(userClassInfo, adventureLog, user, levelCap)
 	} else {
 		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
 	}
@@ -764,7 +819,6 @@ func (a *adventure) addNewEquipmentSheet(equipSheet map[string]*models.Equipment
 func (a *adventure) calculateBaseStat(user models.User, class models.StatModifier, equipmentMap map[string]*models.EquipmentSheet) models.StatModifier {
 	level := float64(user.ClassMap[user.CurrentClass].Level)
 	levelModifier := float64((level / 100) + 1)
-	a.log.Debugf("MantleDPS: %v", equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage)
 	return models.StatModifier{
 		MaxDPS:                 getDynamicStat(20, levelModifier, level, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
 		MinDPS:                 getDynamicStat(20, levelModifier, level, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,

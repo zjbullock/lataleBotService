@@ -136,7 +136,7 @@ func (r *Resolver) GetJobList(ctx context.Context) (*[]*jobClassResolver, error)
 	r.Log.Debugf("jobList: %v", jobList)
 	var jobClasses []*jobClassResolver
 	for _, job := range *jobList {
-		if job.ClassRequirement == nil {
+		if job.LevelRequirement < 150 {
 			jobClasses = append(jobClasses, &jobClassResolver{jobClass: job})
 		}
 	}

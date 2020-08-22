@@ -5,12 +5,12 @@ type Equipment struct {
 	Body           int      `json:"body" firestore:"body"`
 	Glove          int      `json:"glove" firestore:"glove"`
 	Shoes          int      `json:"shoes" firestore:"shoes"`
-	Bindi          *int     `json:"bindi,omitempty" firestore:"bindi,omitempty"`
-	Glasses        *int     `json:"glasses,omitempty" firestore:"glasses,omitempty"`
-	Earring        *int     `json:"earrings,omitempty" firestore:"earrings,omitempty"`
-	Ring           *int     `json:"ring,omitempty" firestore:"ring,omitempty"`
-	Mantle         *int     `json:"mantle,omitempty" firestore:"mantle,omitempty"`
-	Stockings      *int     `json:"stockings,omitempty" firestore:"stockings,omitempty"`
+	Bindi          *int     `json:"bindi" firestore:"bindi,omitempty"`
+	Glasses        *int     `json:"glasses" firestore:"glasses,omitempty"`
+	Earring        *int     `json:"earrings" firestore:"earrings,omitempty"`
+	Ring           *int     `json:"ring" firestore:"ring,omitempty"`
+	Mantle         *int     `json:"mantle" firestore:"mantle,omitempty"`
+	Stockings      *int     `json:"stockings" firestore:"stockings,omitempty"`
 	EquipmentNames []string `json:"equipmentNames,omitempty" firestore:"equipmentNames,omitempty"`
 }
 
