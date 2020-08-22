@@ -16,7 +16,7 @@ type equipment struct {
 type EquipmentRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
 	ReadDocument(id string) (equipment *models.EquipmentSheet, err error)
-	QueryDocuments(args []models.QueryArg) error
+	QueryDocuments(args *[]models.QueryArg) (equipment *models.EquipmentSheet, err error)
 	UpdateDocument(docId string) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
 }
@@ -75,8 +75,27 @@ func (e *equipment) ReadDocument(id string) (equipment *models.EquipmentSheet, e
 	return &equips, nil
 }
 
-func (e *equipment) QueryDocuments(args []models.QueryArg) error {
-	panic("implement me")
+func (e *equipment) QueryDocuments(args *[]models.QueryArg) (equipment *models.EquipmentSheet, err error) {
+	err = e.ds.OpenConnection()
+	if err != nil {
+		e.log.Errorf("failed to open datasource connection")
+		return nil, err
+	}
+	defer e.ds.CloseConnection()
+	docs, err := e.ds.QueryCollection(globals.EQUIPMENT, args)
+	if err != nil {
+		e.log.Errorf("error querying for documents with error: %v", err)
+		return nil, err
+	}
+	equipment = &models.EquipmentSheet{}
+	for _, doc := range docs {
+		err := doc.DataTo(&equipment)
+		if err != nil {
+			e.log.Errorf("error converting doc to profile with error: %v", err)
+			return nil, err
+		}
+	}
+	return equipment, nil
 }
 
 func (e *equipment) UpdateDocument(docId string) (*time.Time, error) {

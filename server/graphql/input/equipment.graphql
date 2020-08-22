@@ -3,4 +3,9 @@ input Equipment {
     Body: Int!
     Glove: Int!
     Shoes: Int!
+    Bindi: Int
+    Glasses: Int
+    Earring: Int
+    Ring: Int
+    Mantle: Int
 }

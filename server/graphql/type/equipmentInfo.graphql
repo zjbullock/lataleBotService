@@ -3,4 +3,10 @@ type EquipmentInfo {
     Glove: String!
     Shoes: String!
     Weapon: String!
+    Bindi: String!
+    Glasses: String!
+    Earrings: String!
+    Ring: String!
+    Mantle: String!
+    Stockings: String!
 }

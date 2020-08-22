@@ -6,6 +6,7 @@ import (
 	"lataleBotService/models"
 	"lataleBotService/services"
 	"strconv"
+	"strings"
 )
 
 type Resolver struct {
@@ -164,7 +165,7 @@ func (r *Resolver) UpgradeEquipment(ctx context.Context, args struct {
 	Id        string
 	Equipment string
 }) (*string, error) {
-	msg, err := r.Services.Adventure.UpdateEquipmentPiece(args.Id, args.Equipment)
+	msg, err := r.Services.Adventure.UpdateEquipmentPiece(args.Id, strings.ToLower(args.Equipment))
 	if err != nil {
 		r.Log.Errorf("error updating equipment piece: %v", err)
 		return nil, err
@@ -172,11 +173,24 @@ func (r *Resolver) UpgradeEquipment(ctx context.Context, args struct {
 	return msg, nil
 }
 
+func (r *Resolver) JobAdvance(ctx context.Context, args struct {
+	Id     string
+	Class  string
+	Weapon string
+}) (*string, error) {
+	message, err := r.Services.Adventure.ClassAdvance(args.Id, strings.Title(strings.ToLower(args.Weapon)), strings.Title(strings.ToLower(args.Class)))
+	if err != nil {
+		r.Log.Errorf("error class advancing: %v", err)
+		return nil, err
+	}
+	return message, nil
+}
+
 func (r *Resolver) GetUpgradeCost(ctx context.Context, args struct {
 	Id        string
 	Equipment string
 }) (*string, error) {
-	message, err := r.Services.Adventure.GetEquipmentPieceCost(args.Id, args.Equipment)
+	message, err := r.Services.Adventure.GetEquipmentPieceCost(args.Id, strings.ToLower(args.Equipment))
 	if err != nil {
 		r.Log.Errorf("error getting equipment cost: %v", err)
 		return nil, err

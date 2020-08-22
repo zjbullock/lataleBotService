@@ -6,6 +6,13 @@ input EquipmentSheet {
     ShoeEvasion: Float!
     GloveAccuracy: Float!
     GloveCriticalDamage: Float!
+    BindiHP: Float!
+    GlassesCritDamage: Float!
+    EarringCritRate: Float!
+    RingCritRate: Float!
+    MantleDamage: Float!
+    StockingEvasion: Float!
+    TierRequirement: Int!
     ArmorDefense: Float!
     WeaponDPS: Float!
     WeaponList: [WeaponType!]!

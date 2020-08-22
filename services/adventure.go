@@ -18,6 +18,7 @@ type Adventure interface {
 	UpdateEquipmentPiece(id, equipment string) (*string, error)
 	GetEquipmentPieceCost(id, equipment string) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
+	ClassAdvance(id, weapon, class string) (*string, error)
 	GetJobList() (*[]models.JobClass, error)
 	GetAdventure(areaId, userId string) (*[]string, *string, error)
 	GetJobClassDescription(id string) (*models.JobClass, error)
@@ -102,12 +103,119 @@ func (a *adventure) GetJobClassDescription(id string) (*models.JobClass, error) 
 	return jobClass, nil
 }
 
+func (a *adventure) ClassAdvance(id, weapon, class string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		message := "You have not created an account yet!"
+		return &message, nil
+	}
+	classInfo, err := a.classes.ReadDocument(class)
+	if err != nil {
+		message := fmt.Sprintf("The class: %v, does not exist!", class)
+		return &message, nil
+	}
+	if classInfo.Tier < 2 {
+		message := fmt.Sprintf("The specified class is a First Tier Class, and cannot be advanced to!")
+		return &message, nil
+	}
+	for _, wep := range classInfo.Weapons {
+		if wep.Name == weapon {
+			if *classInfo.ClassRequirement == user.CurrentClass {
+				if classInfo.LevelRequirement == user.ClassMap[user.CurrentClass].Level {
+					user.ClassMap[class] = models.ClassInfo{
+						Name:          classInfo.Name,
+						Level:         classInfo.LevelRequirement,
+						Exp:           user.ClassMap[user.CurrentClass].Exp,
+						CurrentWeapon: weapon,
+						Equipment:     a.determineStartingGear(classInfo.Tier, user.ClassMap[user.CurrentClass].Equipment),
+					}
+					user.CurrentClass = classInfo.Name
+					_, err := a.users.UpdateDocument(user.ID, user)
+					if err != nil {
+						a.log.Errorf("error updating user doc with new class: %v", err)
+						return nil, err
+					}
+					message := fmt.Sprintf("**Congratulations, %v, on your advancement to %v!**\n", user.Name, user.CurrentClass)
+					message += a.jobTierMessages(classInfo.Tier)
+					return &message, nil
+				}
+				message := fmt.Sprintf("You do not meet the level requirement of %v to complete this job advancement!", classInfo.LevelRequirement)
+				return &message, nil
+			}
+			message := fmt.Sprintf("You do not meet the class requirement of %s to complete this job advancement!", *classInfo.ClassRequirement)
+			return &message, nil
+		}
+	}
+	message := fmt.Sprintf("The specified weapon does not exist on this job!")
+	return &message, nil
+}
+
+func (a *adventure) jobTierMessages(tier int32) string {
+	if tier == 2 {
+		message := fmt.Sprintf("Upon reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earring, Ring, Mantle, and Stockings**.\n")
+		message += fmt.Sprintf("Your weapon has also been upgraded, and more upgrades have become accessible as a result.  Your continued patronage is appreciated.\n")
+		return message
+	}
+	return ""
+}
+
+func (a *adventure) determineStartingGear(tier int32, currentEquips models.Equipment) models.Equipment {
+	weapon := 4
+	if tier == 3 {
+		weapon = 9
+	} else if tier == 4 {
+		weapon = 12
+	}
+	bindi := 4
+	glasses := 4
+	earring := 4
+	ring := 4
+	mantle := 4
+	stocking := 4
+
+	if currentEquips.Bindi != nil {
+		bindi = *currentEquips.Bindi
+	}
+	if currentEquips.Glasses != nil {
+		glasses = *currentEquips.Glasses
+	}
+	if currentEquips.Earring != nil {
+		earring = *currentEquips.Earring
+	}
+	if currentEquips.Ring != nil {
+		ring = *currentEquips.Ring
+	}
+	if currentEquips.Mantle != nil {
+		mantle = *currentEquips.Mantle
+	}
+	if currentEquips.Stockings != nil {
+		stocking = *currentEquips.Stockings
+	}
+
+	return models.Equipment{
+		Weapon:    weapon,
+		Body:      currentEquips.Body,
+		Glove:     currentEquips.Glove,
+		Shoes:     currentEquips.Shoes,
+		Bindi:     &bindi,
+		Glasses:   &glasses,
+		Earring:   &earring,
+		Ring:      &ring,
+		Mantle:    &mantle,
+		Stockings: &stocking,
+	}
+}
+
 func (a *adventure) UpdateEquipmentPiece(id, equipment string) (*string, error) {
+	if equipment == "gloves" {
+		equipment = "glove"
+	}
 	//1.  Get User Info
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
 		return nil, err
 	}
+
 	//2.  Based on equipment piece, pass current gear level to ProcessUpgrade
 	message, err := a.processUpgrade(user, strings.ToLower(equipment))
 	if err != nil {
@@ -118,6 +226,9 @@ func (a *adventure) UpdateEquipmentPiece(id, equipment string) (*string, error) 
 }
 
 func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error) {
+	if equipment == "gloves" {
+		equipment = "glove"
+	}
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
 		return nil, err
@@ -129,7 +240,7 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 	equip := equipmentInterface[equipment]
 	a.log.Debugf("equips :%v", equip)
 	if equip == nil {
-		message := fmt.Sprintf("%s is not a valid piece of equipment!", equipment)
+		message := fmt.Sprintf("%s is not a valid piece of equipment or you have not unlocked this slot yet!", equipment)
 		return &message, nil
 	}
 	oldEquipSheet, err := a.equipment.ReadDocument(fmt.Sprintf("%1.f", equip.(float64)))
@@ -144,17 +255,45 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		message := fmt.Sprintf("No further %s upgrades available at this time!", equipment)
 		return &message, nil
 	}
+	classInfo, err := a.classes.ReadDocument(user.CurrentClass)
+	if err != nil {
+		message := "Something happened while trying to get class info..."
+		return &message, nil
+	}
+	if classInfo.Tier < equipSheet.TierRequirement {
+		message := "You are not at the proper class advancement to advance this piece of equipment any further!"
+		return &message, nil
+	}
+
 	message := fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 	switch equipment {
+	case "bindi":
+		message += fmt.Sprintf("HP gained from bindi: **%1.f** -> **%1.f**\n", oldEquipSheet.BindiHP, equipSheet.BindiHP)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "glasses":
+		message += fmt.Sprintf("Critical Damage gained from glasses: **%1.f** -> **%1.f**\n", oldEquipSheet.GlassesCritDamage, equipSheet.GlassesCritDamage)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "earrings":
+		message += fmt.Sprintf("Critical Rate gained from earrings: **%1.f** -> **%1.f**\n", oldEquipSheet.EarringCritRate, equipSheet.EarringCritRate)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "ring":
+		message += fmt.Sprintf("Critical Rate gained from ring: **%1.f** -> **%1.f**\n", oldEquipSheet.RingCritRate, equipSheet.RingCritRate)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "mantle":
+		message += fmt.Sprintf("Damage gained from mantle: **%1.f** -> **%1.f**\n", oldEquipSheet.MantleDamage, equipSheet.MantleDamage)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
+	case "stockings":
+		message += fmt.Sprintf("Evasion gained from stockings: **%1.f** -> **%1.f**\n", oldEquipSheet.StockingEvasion, equipSheet.StockingEvasion)
+		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "weapon":
 		message += fmt.Sprintf("Damage gained from weapon: **%1.f** -> **%1.f**\n", oldEquipSheet.WeaponDPS, equipSheet.WeaponDPS)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
-	case "shoes":
+	case "shoe", "shoes":
 		oldShoeEvasion := strconv.FormatFloat(oldEquipSheet.ShoeEvasion*100.0, 'f', -1, 64)
 		shoeEvasion := strconv.FormatFloat(equipSheet.ShoeEvasion*100.0, 'f', -1, 64)
 		message += fmt.Sprintf("Evasion gained from shoes: **%s%%** -> **%s%%**\n", oldShoeEvasion, shoeEvasion)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
-	case "glove":
+	case "glove", "gloves":
 		oldGloveAccuracy := strconv.FormatFloat(oldEquipSheet.GloveAccuracy*100.0, 'f', -1, 64)
 		gloveAccuracy := strconv.FormatFloat(equipSheet.GloveAccuracy*100.0, 'f', -1, 64)
 		oldGloveCritDamage := strconv.FormatFloat(oldEquipSheet.GloveCriticalDamage*100.0, 'f', -1, 64)
@@ -178,7 +317,7 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 	equip := equipmentInterface[equipment]
 	a.log.Debugf("equips :%v", equip)
 	if equip == nil {
-		message := fmt.Sprintf("%s is not a valid piece of equipment!", equipment)
+		message := fmt.Sprintf("%s is not a valid piece of equipment, or you have not unlocked this slot yet!", equipment)
 		return &message, nil
 	}
 
@@ -192,6 +331,15 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 
 	if equipSheet.LevelRequirement > user.ClassMap[user.CurrentClass].Level {
 		message := fmt.Sprintf("You do not meet the level requirement to upgrade this piece of gear!  Required Level: %v", equipSheet.LevelRequirement)
+		return &message, nil
+	}
+	classInfo, err := a.classes.ReadDocument(user.CurrentClass)
+	if err != nil {
+		message := "Something happened while trying to get class info..."
+		return &message, nil
+	}
+	if classInfo.Tier < equipSheet.TierRequirement {
+		message := "You are not at the proper class advancement to advance this piece of equipment any further!"
 		return &message, nil
 	}
 
@@ -222,7 +370,11 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 			a.log.Errorf("error updating user document: %v", err)
 			return nil, err
 		}
-		s = fmt.Sprintf("Successfully upgraded %s from %s to %s!", equipment, currentEquipSheet.Name, equipSheet.Name)
+		if equipment == "weapon" {
+			s = fmt.Sprintf("Successfully upgraded %s from %s to %s!", equipment, currentEquipSheet.WeaponMap[user.ClassMap[user.CurrentClass].CurrentWeapon], equipSheet.WeaponMap[user.ClassMap[user.CurrentClass].CurrentWeapon])
+		} else {
+			s = fmt.Sprintf("Successfully upgraded %s from %s to %s!", equipment, currentEquipSheet.Name, equipSheet.Name)
+		}
 	} else {
 		s = fmt.Sprintf("Insufficient Ely!  You need %v more Ely to complete this upgrade.", equipSheet.Cost-*user.Ely)
 		return &s, nil
@@ -253,6 +405,23 @@ func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
 		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Glove)].Name+" Gloves")
 		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Shoes)].Name+" Shoes")
 		classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(classEquips.Weapon)].WeaponMap[user.ClassMap[class.Name].CurrentWeapon])
+		jobClass, err := a.classes.ReadDocument(class.Name)
+		if err != nil {
+			a.log.Errorf("error retrieving class info :%v", err)
+			return nil, nil, err
+		}
+		if jobClass.Tier > 1 {
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Bindi)].Name+" Bindi")
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Glasses)].Name+" Glasses")
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Earring)].Name+" Earrings")
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Ring)].Name+" Ring")
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Mantle)].Name+" Mantle")
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Stockings)].Name+" Stockings")
+		} else {
+			for i := 0; i < 7; i++ {
+				classEquipmentList = append(classEquipmentList, "N/A")
+			}
+		}
 
 		a.log.Errorf("classEquipmentList: %v", classEquipmentList)
 		classInfo := user.ClassMap[class.Name]
@@ -299,6 +468,73 @@ func (a *adventure) getEquipmentMap(classEquips models.Equipment) (map[string]*m
 		}
 		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetWeapon)
 	}
+
+	//Determine Bindi
+	if classEquips.Bindi != nil && classEquipmentMap[strconv.Itoa(*classEquips.Bindi)] == nil {
+
+		equipmentSheetBindi, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Bindi))
+		if err != nil {
+			a.log.Errorf("error retrieving equipment sheet with provided equipment")
+			return nil, err
+		}
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetBindi)
+	}
+
+	//Determine Glasses
+	if classEquips.Glasses != nil && classEquipmentMap[strconv.Itoa(*classEquips.Glasses)] == nil {
+
+		equipmentSheetGlasses, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Glasses))
+		if err != nil {
+			a.log.Errorf("error retrieving equipment sheet with provided equipment")
+			return nil, err
+		}
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetGlasses)
+	}
+
+	//Determine Earring
+	if classEquips.Earring != nil && classEquipmentMap[strconv.Itoa(*classEquips.Earring)] == nil {
+
+		equipmentSheetEarring, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Earring))
+		if err != nil {
+			a.log.Errorf("error retrieving equipment sheet with provided equipment")
+			return nil, err
+		}
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetEarring)
+	}
+
+	//Determine Ring
+	if classEquips.Ring != nil && classEquipmentMap[strconv.Itoa(*classEquips.Ring)] == nil {
+
+		equipmentSheetRing, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Ring))
+		if err != nil {
+			a.log.Errorf("error retrieving equipment sheet with provided equipment")
+			return nil, err
+		}
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetRing)
+	}
+
+	//Determine Mantle
+	if classEquips.Mantle != nil && classEquipmentMap[strconv.Itoa(*classEquips.Mantle)] == nil {
+
+		equipmentSheetMantle, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Mantle))
+		if err != nil {
+			a.log.Errorf("error retrieving equipment sheet with provided equipment")
+			return nil, err
+		}
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetMantle)
+	}
+
+	//Determine Stockings
+	if classEquips.Stockings != nil && classEquipmentMap[strconv.Itoa(*classEquips.Stockings)] == nil {
+
+		equipmentSheetStockings, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Stockings))
+		if err != nil {
+			a.log.Errorf("error retrieving equipment sheet with provided equipment")
+			return nil, err
+		}
+		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetStockings)
+	}
+
 	return classEquipmentMap, nil
 }
 
@@ -515,16 +751,17 @@ func (a *adventure) addNewEquipmentSheet(equipSheet map[string]*models.Equipment
 func (a *adventure) calculateBaseStat(user models.User, class models.StatModifier, equipmentMap map[string]*models.EquipmentSheet) models.StatModifier {
 	level := float64(user.ClassMap[user.CurrentClass].Level)
 	levelModifier := float64((level / 100) + 1)
+	a.log.Debugf("MantleDPS: %v", equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage)
 	return models.StatModifier{
-		MaxDPS:                 getDynamicStat(20, levelModifier, level, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS,
-		MinDPS:                 getDynamicStat(20, levelModifier, level, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS,
+		MaxDPS:                 getDynamicStat(20, levelModifier, level, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
+		MinDPS:                 getDynamicStat(20, levelModifier, level, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
 		Defense:                getDynamicStat(15, levelModifier, level, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense,
-		HP:                     getDynamicStat(100, levelModifier, level, class.HP),
+		HP:                     getDynamicStat(100, levelModifier, level, class.HP) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].BindiHP,
 		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery),
-		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].GloveCriticalDamage,
-		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate),
+		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].GloveCriticalDamage + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].GlassesCritDamage,
+		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].EarringCritRate + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].RingCritRate,
 		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate),
-		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion,
+		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].StockingEvasion,
 		Accuracy:               getStaticStat(0.95, levelModifier, class.Accuracy) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Glove)].GloveAccuracy,
 	}
 }

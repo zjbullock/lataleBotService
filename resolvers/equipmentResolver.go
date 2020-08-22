@@ -24,3 +24,27 @@ func (e *equipmentResolver) Shoes(_ context.Context) string {
 func (e *equipmentResolver) Weapon(_ context.Context) string {
 	return e.equipment.EquipmentNames[3]
 }
+
+func (e *equipmentResolver) Bindi(_ context.Context) string {
+	return e.equipment.EquipmentNames[4]
+}
+
+func (e *equipmentResolver) Glasses(_ context.Context) string {
+	return e.equipment.EquipmentNames[5]
+}
+
+func (e *equipmentResolver) Earrings(_ context.Context) string {
+	return e.equipment.EquipmentNames[6]
+}
+
+func (e *equipmentResolver) Ring(_ context.Context) string {
+	return e.equipment.EquipmentNames[7]
+}
+
+func (e *equipmentResolver) Mantle(_ context.Context) string {
+	return e.equipment.EquipmentNames[8]
+}
+
+func (e *equipmentResolver) Stockings(_ context.Context) string {
+	return e.equipment.EquipmentNames[9]
+}

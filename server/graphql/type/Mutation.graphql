@@ -7,4 +7,5 @@ type Mutation {
     IncreaseLevelCap(levelCap: Int!): [Level]!
     AddLevelTable(levels: [LevelInput!]!): [Level]!
     UpgradeEquipment(id: String!, equipment: String!): String
+    JobAdvance(id: String!, class: String!, weapon: String!): String
 }
