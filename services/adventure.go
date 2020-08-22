@@ -691,24 +691,20 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		a.log.Errorf("error retrieving current levelCap: %v", err)
 		return nil, err
 	}
-	if battleWin && levelCap.Value != user.ClassMap[user.CurrentClass].Level {
+	if battleWin && levelCap.Value >= user.ClassMap[user.CurrentClass].Level {
 		userClassInfo := user.ClassMap[user.CurrentClass]
-		level, err := a.levels.ReadDocument(utils.String(userClassInfo.Level))
-		if err != nil {
-			a.log.Errorf("error getting level data: %v", err)
-			return adventureLog, err
-		}
 		userClassInfo.Exp += monster.Exp
 		*user.Ely += monster.Ely
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%v*** points of experience and ***%v*** Ely!", user.Name, monster.Exp, monster.Ely))
-		if userClassInfo.Exp >= level.Exp {
-			userClassInfo.Exp -= level.Exp
-			userClassInfo.Level++
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **LEVELED UP**!  Current Level: %v", user.Name, userClassInfo.Level))
-		} else {
-			adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.Name, strconv.FormatFloat(monster.Exp, 'f', -1, 64), monster.Ely))
+		userClassInfo, adventureLog, err = a.processLevelUps(userClassInfo, adventureLog, user)
+		if err != nil {
+			a.log.Errorf("error processing level ups: %v", err)
+			return adventureLog, nil
 		}
+
 		user.ClassMap[user.CurrentClass] = userClassInfo
+	} else if levelCap.Value == user.ClassMap[user.CurrentClass].Level {
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v", user.Name, levelCap.Value))
 	}
 	user.LastActionTime = time.Now()
 	_, err = a.users.UpdateDocument(user.ID, user)
@@ -717,6 +713,23 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		return adventureLog, nil
 	}
 	return adventureLog, nil
+}
+
+func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User) (models.ClassInfo, []string, error) {
+	level, err := a.levels.ReadDocument(utils.String(userClassInfo.Level))
+	if err != nil {
+		a.log.Errorf("error getting level data: %v", err)
+		return userClassInfo, adventureLog, err
+	}
+	if userClassInfo.Exp >= level.Exp {
+		userClassInfo.Exp -= level.Exp
+		userClassInfo.Level++
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **LEVELED UP**!  Current Level: %v", user.Name, userClassInfo.Level))
+		return a.processLevelUps(userClassInfo, adventureLog, user)
+	} else {
+		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
+	}
+	return userClassInfo, adventureLog, nil
 }
 
 func (a *adventure) determineMonsterRarity(monsterMap map[string]*[]models.Monster) *[]models.Monster {
