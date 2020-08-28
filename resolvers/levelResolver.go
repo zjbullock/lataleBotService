@@ -13,6 +13,6 @@ func (l *levelResolver) Value(_ context.Context) int32 {
 	return l.level.Value
 }
 
-func (l *levelResolver) Exp(_ context.Context) float64 {
+func (l *levelResolver) Exp(_ context.Context) int32 {
 	return l.level.Exp
 }

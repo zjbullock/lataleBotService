@@ -17,7 +17,7 @@ func (c *classResolver) Level(_ context.Context) int32 {
 	return c.classInfo.Level
 }
 
-func (c *classResolver) Exp(_ context.Context) float64 {
+func (c *classResolver) Exp(_ context.Context) int32 {
 	return c.classInfo.Exp
 }
 

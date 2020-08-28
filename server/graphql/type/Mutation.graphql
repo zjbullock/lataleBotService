@@ -6,6 +6,11 @@ type Mutation {
     AddNewEquipmentSheet(equipment: EquipmentSheet!): String
     IncreaseLevelCap(levelCap: Int!): [Level]!
     AddLevelTable(levels: [LevelInput!]!): [Level]!
+    AddNewParty(id: String!): String
+    JoinParty(id: String!, partyId: String!): String
+    LeaveParty(id: String!): String
     UpgradeEquipment(id: String!, equipment: String!): String
+    ClassChange(id: String!, class: String!, weapon: String): String
+    ToggleExpEvent(expRate: Int!): String
     JobAdvance(id: String!, class: String!, weapon: String!): String
 }

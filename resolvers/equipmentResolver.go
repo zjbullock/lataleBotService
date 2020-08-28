@@ -41,7 +41,7 @@ func (e *equipmentResolver) Ring(_ context.Context) string {
 	return e.equipment.EquipmentNames[7]
 }
 
-func (e *equipmentResolver) Mantle(_ context.Context) string {
+func (e *equipmentResolver) Cloak(_ context.Context) string {
 	return e.equipment.EquipmentNames[8]
 }
 

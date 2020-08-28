@@ -30,13 +30,13 @@ func NewClassRepo(log loggo.Logger, ds datasource.Datasource) ClassRepository {
 
 func (c *character) InsertDocument(id *string, data interface{}) (*string, error) {
 	if id != nil {
-		err := c.ds.OpenConnection()
-		if err != nil {
-			c.log.Errorf("error opening connection to the datasource: %v", err)
-			return nil, err
-		}
-		defer c.ds.CloseConnection()
-		_, err = c.ds.InsertDocumentWithID(globals.CLASSES, *id, data)
+		//err := c.ds.OpenConnection()
+		//if err != nil {
+		//	c.log.Errorf("error opening connection to the datasource: %v", err)
+		//	return nil, err
+		//}
+		//defer c.ds.CloseConnection()
+		_, err := c.ds.InsertDocumentWithID(globals.CLASSES, *id, data)
 		if err != nil {
 			c.log.Errorf("error Inserting Document: %v", err)
 			return nil, err
@@ -53,12 +53,12 @@ func (c *character) InsertDocument(id *string, data interface{}) (*string, error
 }
 
 func (c *character) ReadDocument(id string) (classInfo *models.JobClass, err error) {
-	err = c.ds.OpenConnection()
-	if err != nil {
-		c.log.Errorf("error opening ds connection: %v", err)
-		return nil, err
-	}
-	defer c.ds.CloseConnection()
+	//err = c.ds.OpenConnection()
+	//if err != nil {
+	//	c.log.Errorf("error opening ds connection: %v", err)
+	//	return nil, err
+	//}
+	//defer c.ds.CloseConnection()
 
 	doc, err := c.ds.ReadDocument(globals.CLASSES, id)
 	if err != nil {
@@ -75,12 +75,12 @@ func (c *character) ReadDocument(id string) (classInfo *models.JobClass, err err
 }
 
 func (c *character) QueryDocuments(args *[]models.QueryArg) (*[]models.JobClass, error) {
-	err := c.ds.OpenConnection()
-	if err != nil {
-		c.log.Errorf("failed to open datasource connection")
-		return nil, err
-	}
-	defer c.ds.CloseConnection()
+	//err := c.ds.OpenConnection()
+	//if err != nil {
+	//	c.log.Errorf("failed to open datasource connection")
+	//	return nil, err
+	//}
+	//defer c.ds.CloseConnection()
 	docs, err := c.ds.QueryCollection(globals.CLASSES, args)
 	if err != nil {
 		c.log.Errorf("error querying for documents with error: %v", err)

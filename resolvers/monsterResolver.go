@@ -17,7 +17,7 @@ func (m *monsterResolver) Level(_ context.Context) int32 {
 	return m.monsterInfo.Level
 }
 
-func (m *monsterResolver) Exp(_ context.Context) float64 {
+func (m *monsterResolver) Exp(_ context.Context) int32 {
 	return m.monsterInfo.Exp
 }
 

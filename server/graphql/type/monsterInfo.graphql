@@ -1,7 +1,7 @@
 type MonsterInfo {
     Name: String!
     Level: Int!
-    Exp: Float!
+    Exp: Int!
     Ely: Int!
     Rank: Int!
     Stats: StatInfo

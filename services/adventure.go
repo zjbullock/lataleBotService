@@ -15,12 +15,17 @@ import (
 )
 
 type Adventure interface {
+	ClassChange(id, class string, weapon *string) (*string, error)
+	CreateParty(id string) (*string, error)
+	JoinParty(partyId, id string) (*string, error)
+	LeaveParty(id string) (*string, error)
 	UpdateEquipmentPiece(id, equipment string) (*string, error)
 	GetEquipmentPieceCost(id, equipment string) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
-	ClassAdvance(id, weapon, class string) (*string, error)
+	ClassAdvance(id, weapon, class string, givenClass *string) (*string, error)
 	GetJobList() (*[]models.JobClass, error)
 	GetAdventure(areaId, userId string) (*[]string, *string, error)
+	GetExpGainRate(id string) (*int, error)
 	GetJobClassDescription(id string) (*models.JobClass, error)
 	GetArea(id string) (*models.Area, *string, error)
 	GetAreas() (*[]models.Area, error)
@@ -33,20 +38,259 @@ type adventure struct {
 	users     repositories.UserRepository
 	levels    repositories.LevelRepository
 	equipment repositories.EquipmentRepository
+	config    repositories.ConfigRepository
+	party     repositories.PartyRepository
 	damage    Damage
 	log       loggo.Logger
 }
 
-func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, log loggo.Logger) Adventure {
+func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, config repositories.ConfigRepository, party repositories.PartyRepository, log loggo.Logger) Adventure {
 	return &adventure{
 		areas:     areas,
 		classes:   classes,
 		users:     users,
 		equipment: equips,
 		levels:    levels,
+		config:    config,
+		party:     party,
 		damage:    NewDamageService(log),
 		log:       log,
 	}
+}
+
+func (a *adventure) CreateParty(id string) (*string, error) {
+	//1.  Ensure that user is currently a player of the bot.
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not created an account yet."
+		return &message, nil
+	}
+	//2.  Ensure that user is not currently in a party
+	checkIfInParty, err := a.party.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "members",
+			Op:    "array-contains",
+			Value: id,
+		},
+	})
+	if err != nil {
+		message := fmt.Sprintf("A problem was encountered fetching previous party info.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	if checkIfInParty != nil {
+		message := fmt.Sprintf("You are currently in a party!  To leave your current party, first run **!latale -leaveParty**.")
+		return &message, nil
+	}
+	checkIfPartyLeader, err := a.party.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "leader",
+			Op:    "==",
+			Value: id,
+		},
+	})
+	if err != nil {
+		message := fmt.Sprintf("A problem was encountered fetching previous party info.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	if checkIfPartyLeader != nil {
+		message := fmt.Sprintf("You are currently the leader of a party!  To disband your current party, first run **!latale -leaveParty**.")
+		return &message, nil
+	}
+	//3.  If user is not currently in a party, create a new party.
+	partyId, err := a.party.InsertDocument(nil, &models.Party{
+		Leader:  user.ID,
+		Members: []string{user.ID},
+	})
+	if err != nil {
+		a.log.Errorf("error generating party: %v", err)
+		message := fmt.Sprintf("A problem was encountered creating a party.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	//4.  Update user doc to create relation between them and their current party
+	user.Party = partyId
+	_, err = a.users.UpdateDocument(user.ID, user)
+	if err != nil {
+		a.log.Errorf("error updating user info: %v", err)
+		message := fmt.Sprintf("A problem was encountered creating a party.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	message := fmt.Sprintf("**Congratulations**, your party has been created!\nPlease have members join your party by private messaging the command \"***!latale -joinParty %s***\" to NiceHat.\nTo keep players you do not want to join the party from using the command, please do not post the command publicly", *partyId)
+	return &message, nil
+}
+
+func (a *adventure) JoinParty(partyId, id string) (*string, error) {
+	userInfo, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error retrieving userInfo: %v", err)
+		message := "User has not created an account yet."
+		return &message, nil
+	}
+	//1.  Ensure that user is not currently in a party
+	checkIfInParty, err := a.party.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "members",
+			Op:    "array-contains",
+			Value: id,
+		},
+	})
+	if err != nil {
+		message := fmt.Sprintf("A problem was encountered fetching previous party info.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	if checkIfInParty != nil {
+		message := fmt.Sprintf("You are currently in a party!")
+		return &message, nil
+	}
+	checkIfPartyLeader, err := a.party.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "leader",
+			Op:    "==",
+			Value: id,
+		},
+	})
+	if err != nil {
+		message := fmt.Sprintf("A problem was encountered fetching previous party info.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	if checkIfPartyLeader != nil {
+		message := fmt.Sprintf("You are currently the leader of this party!")
+		return &message, nil
+	}
+
+	party, err := a.party.ReadDocument(partyId)
+	if err != nil {
+		a.log.Errorf("error retrieving party: %v", err)
+		message := "The requested party does not exist!"
+		return &message, nil
+	}
+	//2.  If user is not in party, check that requested party limit is not met.
+	a.log.Debugf("partyMembers: %v", party.Members)
+	if len(party.Members) == 4 {
+		message := fmt.Sprintf("The requested party is already full!")
+		return &message, nil
+	}
+	//3.  If not met, add user to the party.
+	party.Members = append(party.Members, id)
+	_, err = a.party.UpdateDocument(partyId, &party)
+	if err != nil {
+		a.log.Errorf("error updating party info: %v", err)
+		message := fmt.Sprintf("A problem was encountered adding you to the party.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	userInfo.Party = &partyId
+	_, err = a.users.UpdateDocument(userInfo.ID, userInfo)
+	if err != nil {
+		a.log.Errorf("error updating user info: %v", err)
+		message := fmt.Sprintf("A problem was encountered creating a party.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	message := fmt.Sprintf("You have successfully been added to the party!  To leave the party in the future, simply run the command **!latale -leaveParty**")
+	return &message, nil
+}
+
+func (a *adventure) LeaveParty(id string) (*string, error) {
+	userInfo, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error retrieving userInfo: %v", err)
+		message := "User has not created an account yet."
+		return &message, nil
+	}
+	//1.  Ensure that user is not currently in a party
+	var partyId *string
+	checkIfPartyLeader, err := a.party.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "leader",
+			Op:    "==",
+			Value: id,
+		},
+	})
+	if err != nil {
+		message := fmt.Sprintf("A problem was encountered fetching previous party info.  Sorry for the inconvenience")
+		return &message, nil
+	}
+	if checkIfPartyLeader != nil {
+		partyId = checkIfPartyLeader.ID
+	}
+	if partyId == nil {
+		checkIfInParty, err := a.party.QueryDocuments(&[]models.QueryArg{
+			{
+				Path:  "members",
+				Op:    "array-contains",
+				Value: id,
+			},
+		})
+		if err != nil {
+			message := fmt.Sprintf("A problem was encountered fetching previous party info.  Sorry for the inconvenience")
+			return &message, nil
+		}
+		if checkIfInParty != nil {
+			partyId = checkIfInParty.ID
+		} else {
+			message := fmt.Sprintf("You are not currently in a party!")
+			return &message, nil
+		}
+	}
+	party, err := a.party.ReadDocument(*partyId)
+	if err != nil {
+		a.log.Errorf("error retrieving party: %v", err)
+		return nil, err
+	}
+	message := ""
+	if party.Leader == id {
+		//Remove relation of all party members to party first
+		if party.Members != nil && len(party.Members) > 0 {
+			for _, member := range party.Members {
+				userInfo, err := a.users.ReadDocument(member)
+				if err != nil {
+					a.log.Errorf("error retrieving userInfo: %v", err)
+					message := "User has not created an account yet."
+					return &message, nil
+				}
+				//Remove the party's id from the user's info and update document
+				userInfo.Party = nil
+				_, err = a.users.UpdateDocument(member, userInfo)
+				if err != nil {
+					a.log.Errorf("error updating userInfo: %v", err)
+					message := "There was a problem removing you from the party!"
+					return &message, nil
+				}
+			}
+		}
+		//Delete party from party collection
+		err := a.party.DeleteDocument(*party.ID)
+		if err != nil {
+			a.log.Errorf("error disbanding the party: %v", err)
+			return nil, err
+		}
+		message = "You have disbanded the party!"
+	} else {
+		//Create array to hold party members left after leaving
+		partyLeftover := []string{}
+		for _, member := range party.Members {
+			if member != id {
+				partyLeftover = append(partyLeftover, member)
+			}
+		}
+		party.Members = partyLeftover
+		//Update the party to remove the player
+		_, err = a.party.UpdateDocument(*party.ID, &party)
+		if err != nil {
+			a.log.Errorf("error saving new party document: %v", err)
+			message := "There was a problem removing you from the party!"
+			return &message, nil
+		}
+		//Remove the party's id from the user's info and update document
+		userInfo.Party = nil
+		_, err = a.users.UpdateDocument(id, userInfo)
+		if err != nil {
+			a.log.Errorf("error updating userInfo: %v", err)
+			message := "There was a problem removing you from the party!"
+			return &message, nil
+		}
+		message = "You have left the party!"
+	}
+	return &message, nil
 }
 
 func (a *adventure) GetArea(id string) (*models.Area, *string, error) {
@@ -57,6 +301,94 @@ func (a *adventure) GetArea(id string) (*models.Area, *string, error) {
 		return nil, &message, err
 	}
 	return area, nil, nil
+}
+
+func (a *adventure) ClassChange(id, class string, weapon *string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user stats: %v", err)
+		message := "User has not created an account yet."
+		return &message, nil
+	}
+	if user.CurrentClass == class {
+		message := fmt.Sprintf("You're already a %s!", user.CurrentClass)
+		return &message, nil
+	}
+	if user.ClassMap[class] != nil && weapon == nil {
+		user.CurrentClass = user.ClassMap[class].Name
+		_, err := a.users.UpdateDocument(user.ID, user)
+		if err != nil {
+			a.log.Errorf("There was an error processing the class change request: %v", err)
+			message := fmt.Sprintf("There was an error processing the class change request.")
+			return &message, nil
+		}
+		message := fmt.Sprintf("%s has successfully class changed to %s", user.Name, class)
+		return &message, nil
+	} else if user.ClassMap[class] != nil && weapon != nil {
+		message := fmt.Sprintf("You do not need to specify a weapon when changing class to a class you have previously changed to.")
+		return &message, nil
+	}
+	classInfo, err := a.classes.ReadDocument(class)
+	if err != nil {
+		a.log.Errorf("error getting current class: %v", err)
+		message := fmt.Sprintf("The %s class does not exist.  Please select a valid class with a valid weapon", user.CurrentClass)
+		return &message, nil
+	}
+
+	if user.ClassMap[class] == nil && weapon != nil {
+
+		if classInfo.Tier == 1 {
+			for _, classWeapon := range classInfo.Weapons {
+				if classWeapon.Name == strings.Title(strings.ToLower(*weapon)) {
+					user.ClassMap[class] = &models.ClassInfo{
+						Name:          classInfo.Name,
+						Level:         classInfo.LevelRequirement,
+						Exp:           0,
+						CurrentWeapon: strings.Title(strings.ToLower(*weapon)),
+						Equipment: models.Equipment{
+							Weapon: 0,
+							Body:   0,
+							Glove:  0,
+							Shoes:  0,
+						},
+					}
+					user.CurrentClass = class
+					_, err := a.users.UpdateDocument(user.ID, user)
+					if err != nil {
+						a.log.Errorf("There was an error processing the class change request: %v", err)
+						message := fmt.Sprintf("There was an error processing the class change request.")
+						return &message, nil
+					}
+					message := fmt.Sprintf("%s has successfully class changed to %s", user.Name, class)
+					return &message, nil
+				}
+			}
+			message := fmt.Sprintf("%s is not a valid weapon for this class!", strings.Title(strings.ToLower(*weapon)))
+			return &message, nil
+		} else {
+			fmt.Printf("userClasses: %v\n", user.ClassMap)
+			for _, learnedClass := range user.ClassMap {
+				if learnedClass.Name == *classInfo.ClassRequirement && learnedClass.Level >= classInfo.LevelRequirement {
+					message, err := a.ClassAdvance(id, strings.Title(strings.ToLower(*weapon)), class, &learnedClass.Name)
+					if err != nil {
+						a.log.Errorf("error while switching and upgrading a class: %v", err)
+						return nil, err
+					}
+					return message, nil
+				}
+			}
+		}
+	}
+	message := "Please provide a weapon, as this is your first time creating this class."
+	return &message, nil
+}
+
+func (a *adventure) GetExpGainRate(id string) (*int, error) {
+	expGainRate, err := a.config.ReadDocument("exp")
+	if err != nil {
+		return nil, err
+	}
+	return expGainRate["exp"], nil
 }
 
 func (a *adventure) GetAreas() (*[]models.Area, error) {
@@ -103,7 +435,7 @@ func (a *adventure) GetJobClassDescription(id string) (*models.JobClass, error) 
 	return jobClass, nil
 }
 
-func (a *adventure) ClassAdvance(id, weapon, class string) (*string, error) {
+func (a *adventure) ClassAdvance(id, weapon, class string, givenClass *string) (*string, error) {
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
 		message := "You have not created an account yet!"
@@ -114,17 +446,21 @@ func (a *adventure) ClassAdvance(id, weapon, class string) (*string, error) {
 		message := fmt.Sprintf("The class: %v, does not exist!", class)
 		return &message, nil
 	}
+	if user.ClassMap[classInfo.Name] != nil {
+		message := fmt.Sprintf("You've already advanced to %s.", classInfo.Name)
+		return &message, nil
+	}
 	if classInfo.Tier < 2 {
 		message := fmt.Sprintf("The specified class is a First Tier Class, and cannot be advanced to!")
 		return &message, nil
 	}
 	for _, wep := range classInfo.Weapons {
 		if wep.Name == weapon {
-			if *classInfo.ClassRequirement == user.CurrentClass {
-				if classInfo.LevelRequirement == user.ClassMap[user.CurrentClass].Level {
-					user.ClassMap[class] = models.ClassInfo{
+			if *classInfo.ClassRequirement == user.CurrentClass || *classInfo.ClassRequirement == *givenClass {
+				if classInfo.LevelRequirement <= user.ClassMap[user.CurrentClass].Level {
+					user.ClassMap[class] = &models.ClassInfo{
 						Name:          classInfo.Name,
-						Level:         classInfo.LevelRequirement,
+						Level:         user.ClassMap[user.CurrentClass].Level,
 						Exp:           user.ClassMap[user.CurrentClass].Exp,
 						CurrentWeapon: weapon,
 						Equipment:     a.determineStartingGear(classInfo.Tier, user.ClassMap[user.CurrentClass].Equipment),
@@ -152,7 +488,7 @@ func (a *adventure) ClassAdvance(id, weapon, class string) (*string, error) {
 
 func (a *adventure) jobTierMessages(tier int32) string {
 	if tier == 2 {
-		message := fmt.Sprintf("Upon reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earring, Ring, Mantle, and Stockings**.\n")
+		message := fmt.Sprintf("Upon reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earring, Ring, Cloak, and Stockings**.\n")
 		message += fmt.Sprintf("Your weapon has also been upgraded, and more upgrades have become accessible as a result.  Your continued patronage is appreciated.\n")
 		return message
 	}
@@ -185,8 +521,8 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips models.Equip
 	if currentEquips.Ring != nil {
 		ring = *currentEquips.Ring
 	}
-	if currentEquips.Mantle != nil {
-		mantle = *currentEquips.Mantle
+	if currentEquips.Cloak != nil {
+		mantle = *currentEquips.Cloak
 	}
 	if currentEquips.Stockings != nil {
 		stocking = *currentEquips.Stockings
@@ -201,7 +537,7 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips models.Equip
 		Glasses:   &glasses,
 		Earring:   &earring,
 		Ring:      &ring,
-		Mantle:    &mantle,
+		Cloak:     &mantle,
 		Stockings: &stocking,
 	}
 }
@@ -291,9 +627,9 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
 		message += fmt.Sprintf("Critical Rate gained from ring: **%s%%** -> **%s%%**\n", oldRing, ring)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
-	case "mantle":
+	case "cloak", "mantle":
 		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
-		message += fmt.Sprintf("Damage gained from mantle: **%1.f** -> **%1.f**\n", oldEquipSheet.MantleDamage, equipSheet.MantleDamage)
+		message += fmt.Sprintf("Damage gained from cloak: **%1.f** -> **%1.f**\n", oldEquipSheet.MantleDamage, equipSheet.MantleDamage)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 	case "stockings":
 		oldStockingsEvasion := strconv.FormatFloat(oldEquipSheet.StockingEvasion*100.0, 'f', -1, 64)
@@ -305,7 +641,7 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 		message += fmt.Sprintf("Damage gained from weapon: **%1.f** -> **%1.f**\n", oldEquipSheet.WeaponDPS, equipSheet.WeaponDPS)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
-	case "shoe", "shoes":
+	case "shoe", "shoes", "boot", "boots":
 		oldShoeEvasion := strconv.FormatFloat(oldEquipSheet.ShoeEvasion*100.0, 'f', -1, 64)
 		shoeEvasion := strconv.FormatFloat(equipSheet.ShoeEvasion*100.0, 'f', -1, 64)
 		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
@@ -332,7 +668,6 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 	var equipmentInterface map[string]interface{}
 	equips := user.ClassMap[user.CurrentClass].Equipment
 	a.log.Debugf("equipment: %v", equipment)
-	a.log.Debugf("equips: %v", *equips.Earring)
 	bytes, _ := json.Marshal(&equips)
 	json.Unmarshal(bytes, &equipmentInterface)
 	equip := equipmentInterface[equipment]
@@ -444,7 +779,7 @@ func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
 			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Glasses)].Name+" Glasses")
 			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Earring)].Name+" Earrings")
 			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Ring)].Name+" Ring")
-			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Mantle)].Name+" Mantle")
+			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Cloak)].Name+" Cloak")
 			classEquipmentList = append(classEquipmentList, classEquipmentMap[strconv.Itoa(*classEquips.Stockings)].Name+" Stockings")
 		} else {
 			for i := 0; i < 7; i++ {
@@ -456,6 +791,33 @@ func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
 		classInfo := user.ClassMap[class.Name]
 		classInfo.Equipment.EquipmentNames = classEquipmentList
 		user.ClassMap[class.Name] = classInfo
+	}
+	if user.Party != nil {
+		party, err := a.party.ReadDocument(*user.Party)
+		if err != nil {
+			a.log.Errorf("error fetching party info")
+			return user, nil, nil
+		}
+		var partyMemberInfo []string
+		partyMemberInfo = append(partyMemberInfo, fmt.Sprintf("\n**Party Info:**"))
+		partyMemberInfo = append(partyMemberInfo, fmt.Sprintf("\n**Party Leader:**"))
+		memberInfo, err := a.users.ReadDocument(party.Leader)
+		if err != nil {
+			a.log.Errorf("error getting party member info: %v", memberInfo)
+			return user, nil, nil
+		}
+		partyMemberInfo = append(partyMemberInfo, fmt.Sprintf("**Name:** %s, **Class:** %s, **Level:** %v", memberInfo.Name, memberInfo.CurrentClass, memberInfo.ClassMap[memberInfo.CurrentClass].Level))
+
+		partyMemberInfo = append(partyMemberInfo, fmt.Sprintf("\n**Party Members:**"))
+		for _, member := range party.Members {
+			memberInfo, err := a.users.ReadDocument(member)
+			if err != nil {
+				a.log.Errorf("error getting party member info: %v", memberInfo)
+				return user, nil, nil
+			}
+			partyMemberInfo = append(partyMemberInfo, fmt.Sprintf("**Name:** %s, **Class:** %s, **Level:** %v", memberInfo.Name, memberInfo.CurrentClass, memberInfo.ClassMap[memberInfo.CurrentClass].Level))
+		}
+		user.PartyMembers = &partyMemberInfo
 	}
 
 	return user, nil, nil
@@ -542,10 +904,10 @@ func (a *adventure) getEquipmentMap(classEquips models.Equipment) (map[string]*m
 		classEquipmentMap = a.addNewEquipmentSheet(classEquipmentMap, equipmentSheetRing)
 	}
 
-	//Determine Mantle
-	if classEquips.Mantle != nil && classEquipmentMap[strconv.Itoa(*classEquips.Mantle)] == nil {
+	//Determine Cloak
+	if classEquips.Cloak != nil && classEquipmentMap[strconv.Itoa(*classEquips.Cloak)] == nil {
 
-		equipmentSheetMantle, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Mantle))
+		equipmentSheetMantle, err := a.equipment.ReadDocument(strconv.Itoa(*classEquips.Cloak))
 		if err != nil {
 			a.log.Errorf("error retrieving equipment sheet with provided equipment")
 			return nil, err
@@ -605,14 +967,24 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
 		return nil, &message, nil
 	}
+
 	levelCap, err := a.levels.ReadDocument("levelCap")
 	if err != nil {
 		a.log.Errorf("error getting current level cap: %v", err)
 		return nil, nil, err
 	}
-	if levelCap.Value < area.LevelRange.Min {
+	a.log.Debugf("levelCap: %v", levelCap)
+	if levelCap.Value <= area.LevelRange.Min {
 		levelRestriction := fmt.Sprintf("Area %v is currently inaccessible due to level cap restrictions!", areaId)
 		return &[]string{levelRestriction}, nil, nil
+	}
+	if user.Party != nil {
+		adventureLog, err := a.createPartyAdventureLog(user, area)
+		if err != nil {
+			a.log.Errorf("encountered error generating adventure log: %v", err)
+			return &adventureLog, nil, err
+		}
+		return &adventureLog, nil, nil
 	}
 	var monsterMap = make(map[string]*[]models.Monster)
 	for _, monster := range area.Monsters {
@@ -625,12 +997,14 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 	}
 
 	a.log.Debugf("monsters possible: %v", monsterMap)
-	monsters := a.determineMonsterRarity(monsterMap)
+	randSource := rand.NewSource(time.Now().UnixNano())
+	rarityGenerator := rand.New(randSource)
+	monsters := a.determineMonsterRarity(monsterMap, rarityGenerator)
 	if monsters == nil {
 		afraid := fmt.Sprintf("The monsters in the %s are too afraid of fighting %s", areaId, userId)
 		return &[]string{afraid}, nil, nil
 	}
-	monster := a.determineMonster(*monsters)
+	monster := a.determineMonster(*monsters, rarityGenerator)
 	currentStats, _, err := a.GetBaseStat(userId)
 	if err != nil {
 		a.log.Errorf("error getting user stats: %v", err)
@@ -651,8 +1025,87 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 	return &adventureLog, nil, nil
 }
 
-func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) ([]string, error) {
+func (a *adventure) createPartyAdventureLog(user *models.User, area *models.Area) ([]string, error) {
+	var monsterMap = make(map[string]*[]models.Monster)
+	for _, monster := range area.Monsters {
+		if monsterMap[utils.String(monster.Rank)] == nil {
+			monsterMap[utils.String(monster.Rank)] = &[]models.Monster{}
+		}
+		updatedList := *monsterMap[utils.String(monster.Rank)]
+		updatedList = append(updatedList, monster)
+		monsterMap[utils.String(monster.Rank)] = &updatedList
+	}
+
+	a.log.Debugf("monsters possible: %v", monsterMap)
 	var adventureLog []string
+	adventureLog, onCooldown := a.checkAdventureCooldown(user, adventureLog)
+	if onCooldown {
+		return adventureLog, nil
+	}
+	party, err := a.party.ReadDocument(*user.Party)
+	if err != nil {
+		a.log.Errorf("encountered error generating adventure log: %v", err)
+		return nil, err
+	}
+	var partyMemberInfos []*models.UserBlob
+	for _, member := range party.Members {
+		userInfo, err := a.users.ReadDocument(member)
+		if err != nil {
+			a.log.Errorf("error getting user info: %v", err)
+			return nil, err
+		}
+		userStats, _, err := a.GetBaseStat(member)
+		if err != nil {
+			a.log.Errorf("error getting user base stats: %v", err)
+			return nil, err
+		}
+		userJob, err := a.classes.ReadDocument(userInfo.CurrentClass)
+		if err != nil {
+			a.log.Errorf("error getting current class: %v", err)
+			return nil, err
+		}
+		partyMemberInfos = append(partyMemberInfos, &models.UserBlob{
+			User:         userInfo,
+			StatModifier: userStats,
+			JobClass:     userJob,
+			CurrentHP:    int(userStats.HP),
+			MaxHP:        int(userStats.HP),
+			UserLevel:    userInfo.ClassMap[userInfo.CurrentClass].Level,
+			Weapon:       userInfo.ClassMap[userInfo.CurrentClass].CurrentWeapon,
+		})
+	}
+	randSource := rand.NewSource(time.Now().UnixNano())
+	monsterCount := 1
+	if len(partyMemberInfos) > 1 {
+		randomMonsterCount := rand.New(randSource)
+		monsterCount = randomMonsterCount.Intn(len(partyMemberInfos)) + 1
+	}
+	var encounteredMonsters []*models.MonsterBlob
+	rarityGenerator := rand.New(randSource)
+	for i := 0; i < monsterCount; i++ {
+		monsters := a.determineMonsterRarity(monsterMap, rarityGenerator)
+		monster := a.determineMonster(*monsters, rarityGenerator)
+		monsterRank := ""
+		for i := int32(0); i < monster.Rank; i++ {
+			monsterRank += "!"
+		}
+		encounteredMonsters = append(encounteredMonsters, &models.MonsterBlob{
+			CurrentHP:    int32(monster.Stats.HP),
+			StatModifier: &monster.Stats,
+			Name:         monster.Name + " " + string('A'+i) + monsterRank,
+			Ely:          monster.Ely,
+			Exp:          monster.Exp,
+		})
+	}
+	adventureLog, err = a.partyBattleLog(partyMemberInfos, encounteredMonsters, adventureLog, user)
+	if err != nil {
+		a.log.Errorf("error creating adventurelog: %v", err)
+		return nil, err
+	}
+	return adventureLog, nil
+}
+
+func (a *adventure) checkAdventureCooldown(user *models.User, adventureLog []string) ([]string, bool) {
 	lastAction := user.LastActionTime.Add(120 * time.Second)
 	if !time.Now().After(lastAction) {
 		timeDifference := lastAction.Sub(time.Now())
@@ -669,9 +1122,193 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			}
 		}
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ must wait **%v** ***Minutes*** and **%v** ***Seconds*** before using the adventure command again!", user.Name, minutes, seconds))
-		return adventureLog, nil
+		return adventureLog, true
+	}
+	return adventureLog, false
+}
+
+func (a *adventure) partyBattleLog(users []*models.UserBlob, encounteredMonsters []*models.MonsterBlob, adventureLog []string, primaryUser *models.User) ([]string, error) {
+	battleWin := false
+	randSource := rand.NewSource(time.Now().UnixNano())
+	randGenerator := rand.New(randSource)
+	totalExpReward := int32(0)
+	totalElyReward := int32(0)
+	partyBonus := 1.0 + (float64(len(users)/10.0) * 3.5)
+	monsterNames := ""
+	for _, monster := range encounteredMonsters {
+		totalExpReward += int32(float64(monster.Exp) * partyBonus)
+		totalElyReward += int32(float64(monster.Ely) * partyBonus)
+	}
+	if len(encounteredMonsters) > 1 {
+		for i, monster := range encounteredMonsters {
+			if i == len(encounteredMonsters)-1 {
+				monsterNames += "and a " + monster.Name
+			} else {
+				monsterNames += monster.Name + ", "
+			}
+		}
+	} else {
+		monsterNames += encounteredMonsters[0].Name
+	}
+	adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ has encountered a __**%s**__", monsterNames))
+combat:
+	for a.checkGroupDeaths(users, encounteredMonsters) {
+		//Party will target enemies in order of how they spawn.
+		//Enemies will attack party members randomly.
+		//Battle continues until one side is no longer able to fight.
+		for _, user := range users {
+			userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, encounteredMonsters[0].Name, *user.StatModifier, *encounteredMonsters[0].StatModifier, &user.Weapon, user.JobClass, &user.UserLevel)
+			currentMonsterHP := int(encounteredMonsters[0].CurrentHP)
+			currentMonsterHP = ((int(currentMonsterHP) - int(damage)) + int(math.Abs(float64(currentMonsterHP-damage)))) / 2
+			adventureLog = append(adventureLog, userLog)
+			monsterMaxHp := int(encounteredMonsters[0].StatModifier.HP)
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", encounteredMonsters[0].Name, currentMonsterHP, monsterMaxHp))
+			encounteredMonsters[0].CurrentHP = int32(currentMonsterHP)
+			if encounteredMonsters[0].CurrentHP <= 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!", user.User.Name, encounteredMonsters[0].Name))
+				copy(encounteredMonsters[0:], encounteredMonsters[0+1:]) // Shift a[i+1:] left one index.
+				encounteredMonsters[len(encounteredMonsters)-1] = nil    // Erase last element (write zero value).
+				encounteredMonsters = encounteredMonsters[:len(encounteredMonsters)-1]
+			}
+			if len(encounteredMonsters) == 0 {
+				battleWin = true
+				break combat
+			}
+		}
+		for _, monster := range encounteredMonsters {
+			a.log.Debugf("users: %v", users)
+			targetedUser := randGenerator.Intn(len(users))
+			monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, users[targetedUser].User.Name, *monster.StatModifier, *users[targetedUser].StatModifier, nil, nil, nil)
+			users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
+			adventureLog = append(adventureLog, monsterLog)
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP))
+			if users[targetedUser].CurrentHP <= 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", users[targetedUser].User.Name, monster.Name))
+				copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
+				users[len(users)-1] = nil                          // Erase last element (write zero value).
+				users = users[:len(users)-1]
+			}
+			a.log.Debugf("users: %v", users)
+			if len(users) == 0 {
+				break combat
+			}
+		}
+		for i, user := range users {
+			userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
+			if user.CurrentHP == int(user.StatModifier.HP) {
+
+			} else if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
+				user.CurrentHP = int(user.CurrentHP)
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+			} else {
+				user.CurrentHP += userHeal
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+			}
+			users[i].CurrentHP = user.CurrentHP
+
+		}
+		for i, monster := range encounteredMonsters {
+			if monster.StatModifier.Recovery > 0.0 {
+				monsterHeal := int32(monster.StatModifier.HP * monster.StatModifier.Recovery)
+				if monsterHeal+monster.CurrentHP > int32(monster.StatModifier.HP) {
+					monster.CurrentHP = int32(monster.StatModifier.HP)
+				} else {
+					monster.CurrentHP += monsterHeal
+				}
+				encounteredMonsters[i].CurrentHP = monster.CurrentHP
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **HEALED** for %v HP.", monster.Name, monsterHeal))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", monster.Name, monsterHeal+monster.CurrentHP, strconv.FormatFloat(monster.StatModifier.HP, 'f', -1, 64)))
+			}
+
+		}
 	}
 
+	if battleWin {
+		adventureLog = append(adventureLog, "**---------------------------- PARTY WON THE BATTLE.  GETTING RESULTS. ----------------------------**")
+		levelCap, err := a.levels.ReadDocument("levelCap")
+		if err != nil {
+			a.log.Errorf("error retrieving current levelCap: %v", err)
+			return nil, err
+		}
+		expGainRate, err := a.GetExpGainRate("exp")
+		if err != nil {
+			return nil, err
+		}
+		for _, user := range users {
+			userInfo := user.User
+			if levelCap.Value > user.User.ClassMap[user.User.CurrentClass].Level {
+				userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
+				monsterExp := totalExpReward / int32(len(users)) * int32(*expGainRate)
+				userClassInfo.Exp += monsterExp
+				monsterEly := totalElyReward / int32(len(users)) * int32(*expGainRate)
+				oldEly := *user.User.Ely
+				oldEly += totalElyReward / int32(len(users)) * int32(*expGainRate)
+				userInfo.Ely = &oldEly
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.User.Name, utils.String(monsterExp), monsterEly))
+				newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, user.User, levelCap.Value)
+				if err != nil {
+					a.log.Errorf("error processing level ups: %v", err)
+					return adventureLog, nil
+				}
+				user.User.ClassMap[user.User.CurrentClass] = &newUserClassInfo
+				adventureLog = newAdventureLog
+			} else if battleWin && levelCap.Value == user.User.ClassMap[user.User.CurrentClass].Level {
+				userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
+				monsterExp := totalExpReward / int32(len(users)) * int32(*expGainRate)
+				userClassInfo.Exp += monsterExp
+				monsterEly := totalElyReward / int32(len(users)) * int32(*expGainRate)
+				oldEly := *user.User.Ely
+				oldEly += totalElyReward / int32(len(users)) * int32(*expGainRate)
+				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
+				userInfo.Ely = &oldEly
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.User.Name, utils.String(monsterExp), monsterEly))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.User.Name, levelCap.Value))
+			}
+			if primaryUser.ID == userInfo.ID {
+				userInfo.LastActionTime = time.Now()
+			}
+			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			if err != nil {
+				a.log.Errorf("failed to update user doc with error: %v", err)
+				return adventureLog, nil
+			}
+		}
+
+	}
+	a.log.Debugf("encounteredMonsters: %v", encounteredMonsters)
+	return adventureLog, nil
+}
+
+func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonsters []*models.MonsterBlob) bool {
+	playersAlive := len(users)
+	for _, user := range users {
+		if user.CurrentHP == 0 {
+			playersAlive--
+		}
+		if playersAlive == 0 {
+			return false
+		}
+	}
+	monstersAlive := len(encounteredMonsters)
+	for _, monster := range encounteredMonsters {
+		if monster.CurrentHP == 0 {
+			monstersAlive--
+		}
+		if monstersAlive == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) ([]string, error) {
+	var adventureLog []string
+	adventureLog, onCooldown := a.checkAdventureCooldown(user, adventureLog)
+	if onCooldown {
+		return adventureLog, nil
+	}
 	battleWin := false
 	userMaxHP := int(userStats.HP)
 	monsterMaxHp := int(monster.Stats.HP)
@@ -705,13 +1342,17 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			break
 		}
 		userHeal := int(userStats.HP * userStats.Recovery)
-		if userHeal+currentHP > int(userStats.HP) {
+		if currentHP == int(userStats.HP) {
+		} else if userHeal+currentHP > int(userStats.HP) {
 			currentHP = int(userStats.HP)
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
 		} else {
 			currentHP += userHeal
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
 		}
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
+
 		if monster.Stats.Recovery > 0.0 {
 			monsterHeal := int(monster.Stats.HP * monster.Stats.Recovery)
 			if monsterHeal+monsterHP > int(monster.Stats.HP) {
@@ -729,20 +1370,41 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		a.log.Errorf("error retrieving current levelCap: %v", err)
 		return nil, err
 	}
-	if battleWin && levelCap.Value >= user.ClassMap[user.CurrentClass].Level {
-		userClassInfo := user.ClassMap[user.CurrentClass]
-		userClassInfo.Exp += monster.Exp
-		*user.Ely += monster.Ely
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.Name, strconv.FormatFloat(monster.Exp, 'f', -1, 64), monster.Ely))
-		userClassInfo, adventureLog, err = a.processLevelUps(userClassInfo, adventureLog, user, levelCap.Value)
+	if battleWin && levelCap.Value > user.ClassMap[user.CurrentClass].Level {
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", user.Name))
+		userClassInfo := *user.ClassMap[user.CurrentClass]
+		expGainRate, err := a.GetExpGainRate("exp")
+		if err != nil {
+			return nil, err
+		}
+		monsterExp := monster.Exp * int32(*expGainRate)
+		userClassInfo.Exp += monsterExp
+		monsterEly := monster.Ely * int32(*expGainRate)
+		*user.Ely += monsterEly
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
+		a.log.Debugf("userClassInfo: %v\n", userClassInfo)
+		newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, user, levelCap.Value)
 		if err != nil {
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
 		}
 
-		user.ClassMap[user.CurrentClass] = userClassInfo
-	} else if levelCap.Value == user.ClassMap[user.CurrentClass].Level {
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v", user.Name, levelCap.Value))
+		user.ClassMap[user.CurrentClass] = &newUserClassInfo
+		adventureLog = newAdventureLog
+	} else if battleWin && levelCap.Value == user.ClassMap[user.CurrentClass].Level {
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", user.Name))
+		userClassInfo := *user.ClassMap[user.CurrentClass]
+		expGainRate, err := a.GetExpGainRate("exp")
+		if err != nil {
+			return nil, err
+		}
+		monsterExp := monster.Exp * int32(*expGainRate)
+		userClassInfo.Exp += monsterExp
+		monsterEly := monster.Ely * int32(*expGainRate)
+		*user.Ely += monsterEly
+		user.ClassMap[user.CurrentClass] = &userClassInfo
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
 	}
 	user.LastActionTime = time.Now()
 	_, err = a.users.UpdateDocument(user.ID, user)
@@ -759,6 +1421,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 		a.log.Errorf("error getting level data: %v", err)
 		return userClassInfo, adventureLog, err
 	}
+	a.log.Debugf("userclassInfo: %v", userClassInfo)
 	if userClassInfo.Exp >= level.Exp {
 		userClassInfo.Exp -= level.Exp
 		userClassInfo.Level++
@@ -782,14 +1445,12 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 		}
 		return a.processLevelUps(userClassInfo, adventureLog, user, levelCap)
 	} else {
-		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", strconv.FormatFloat(userClassInfo.Exp, 'f', -1, 64), strconv.FormatFloat(level.Exp, 'f', -1, 64)))
+		adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", utils.String(userClassInfo.Exp), utils.String(level.Exp)))
 	}
 	return userClassInfo, adventureLog, nil
 }
 
-func (a *adventure) determineMonsterRarity(monsterMap map[string]*[]models.Monster) *[]models.Monster {
-	randSource := rand.NewSource(time.Now().UnixNano())
-	rarityGenerator := rand.New(randSource)
+func (a *adventure) determineMonsterRarity(monsterMap map[string]*[]models.Monster, rarityGenerator *rand.Rand) *[]models.Monster {
 	rarityPercent := rarityGenerator.Intn(100) + 1
 	if monsterMap["3"] != nil && rarityPercent >= 96 {
 		return monsterMap["3"]
@@ -799,9 +1460,8 @@ func (a *adventure) determineMonsterRarity(monsterMap map[string]*[]models.Monst
 	return monsterMap["1"]
 }
 
-func (a *adventure) determineMonster(monsters []models.Monster) models.Monster {
-	randSource := rand.NewSource(time.Now().UnixNano())
-	monsterSelection := rand.New(randSource)
+func (a *adventure) determineMonster(monsters []models.Monster, rarityGenerator rand.Source) models.Monster {
+	monsterSelection := rand.New(rarityGenerator)
 	if len(monsters) == 1 {
 		return monsters[0]
 	}
@@ -820,10 +1480,10 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 	level := float64(user.ClassMap[user.CurrentClass].Level)
 	levelModifier := float64((level / 100) + 1)
 	return models.StatModifier{
-		MaxDPS:                 getDynamicStat(20, levelModifier, level, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
-		MinDPS:                 getDynamicStat(20, levelModifier, level, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
-		Defense:                getDynamicStat(15, levelModifier, level, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense,
-		HP:                     getDynamicStat(100, levelModifier, level, class.HP) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].BindiHP,
+		MaxDPS:                 getDynamicStat(20, levelModifier, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
+		MinDPS:                 getDynamicStat(20, levelModifier, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
+		Defense:                getDynamicStat(15, levelModifier, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense,
+		HP:                     getDynamicStat(100, levelModifier, class.HP) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].BindiHP,
 		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery),
 		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].GloveCriticalDamage + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].GlassesCritDamage,
 		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].EarringCritRate + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].RingCritRate,
@@ -833,7 +1493,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 	}
 }
 
-func getDynamicStat(baseStat, levelModifier, level, statModifier float64) float64 {
+func getDynamicStat(baseStat, levelModifier, statModifier float64) float64 {
 	return baseStat * statModifier * math.Pow(levelModifier, 7)
 }
 

@@ -1,10 +1,12 @@
 package main
 
 import (
+	. "cloud.google.com/go/firestore"
 	"context"
 	"github.com/gorilla/handlers"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/juju/loggo"
+	"google.golang.org/api/option"
 	"lataleBotService/datasource"
 	"lataleBotService/globals"
 	"lataleBotService/handler"
@@ -18,6 +20,7 @@ import (
 
 var (
 	ctx          = context.Background()
+	client       *Client
 	l            loggo.Logger
 	handlerFuncs *handler.Funcs
 	ds           datasource.Datasource
@@ -30,27 +33,37 @@ func init() {
 	if err != nil {
 		l.Criticalf("error occurred while fetching graphql schema: %v", err)
 	}
-	ds = datasource.NewDataSource(l, ctx, globals.PROJECTID)
+	client, err := NewClient(ctx, globals.PROJECTID, option.WithCredentialsFile("./credentials-prod.json"), option.WithGRPCConnectionPool(10))
+	if err != nil {
+		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", globals.PROJECTID, err)
+		return
+	}
+	//ds = datasource.NewDataSource(l, ctx, globals.PROJECTID)
+	ds = datasource.NewDataSource(l, ctx, client)
 	repos := struct {
 		area    repositories.AreasRepository
 		classes repositories.ClassRepository
 		user    repositories.UserRepository
 		levels  repositories.LevelRepository
 		equips  repositories.EquipmentRepository
+		config  repositories.ConfigRepository
+		party   repositories.PartyRepository
 	}{
 		area:    repositories.NewAreaRepo(l, ds),
 		classes: repositories.NewClassRepo(l, ds),
 		user:    repositories.NewUserRepo(l, ds),
 		levels:  repositories.NewLevelRepo(l, ds),
 		equips:  repositories.NewEquipmentRepo(l, ds),
+		config:  repositories.NewConfigRepo(l, ds),
+		party:   repositories.NewPartiesRepo(l, ds),
 	}
 	service := struct {
 		Adventure services.Adventure
 		Manage    services.Manage
 		Damage    services.Damage
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, l),
-		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, l),
+		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, l),
 		Damage:    services.NewDamageService(l),
 	}
 	handlerFuncs = &handler.Funcs{

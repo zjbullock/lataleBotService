@@ -28,7 +28,11 @@ func (u *userResolver) CurrentClass(_ context.Context) string {
 func (u *userResolver) Classes(_ context.Context) *[]*classResolver {
 	var classes []*classResolver
 	for _, class := range u.user.ClassMap {
-		classes = append(classes, &classResolver{classInfo: class})
+		classes = append(classes, &classResolver{classInfo: *class})
 	}
 	return &classes
+}
+
+func (u *userResolver) PartyMembers(_ context.Context) *[]string {
+	return u.user.PartyMembers
 }

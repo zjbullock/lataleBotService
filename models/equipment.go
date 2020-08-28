@@ -9,7 +9,7 @@ type Equipment struct {
 	Glasses        *int     `json:"glasses" firestore:"glasses,omitempty"`
 	Earring        *int     `json:"earrings" firestore:"earrings,omitempty"`
 	Ring           *int     `json:"ring" firestore:"ring,omitempty"`
-	Mantle         *int     `json:"mantle" firestore:"mantle,omitempty"`
+	Cloak          *int     `json:"mantle" firestore:"mantle,omitempty"`
 	Stockings      *int     `json:"stockings" firestore:"stockings,omitempty"`
 	EquipmentNames []string `json:"equipmentNames,omitempty" firestore:"equipmentNames,omitempty"`
 }

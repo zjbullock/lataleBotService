@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"github.com/juju/loggo"
 	"lataleBotService/models"
 	"lataleBotService/services"
@@ -29,6 +30,29 @@ func (r *Resolver) IncreaseLevelCap(ctx context.Context, args struct{ LevelCap i
 		levels = append(levels, &levelResolver{level: level})
 	}
 	return levels, nil
+}
+
+func (r *Resolver) ClassChange(ctx context.Context, args struct {
+	Id     string
+	Class  string
+	Weapon *string
+}) (*string, error) {
+	message, err := r.Services.Adventure.ClassChange(args.Id, strings.Title(strings.ToLower(args.Class)), args.Weapon)
+	if err != nil {
+		return nil, err
+	}
+	return message, err
+}
+
+func (r *Resolver) ToggleExpEvent(ctx context.Context, args struct{ ExpRate int32 }) (*string, error) {
+	err := r.Services.Manage.ToggleExpEvent(int(args.ExpRate))
+	message := ""
+	if err != nil {
+		r.Log.Errorf("error flipping exp flag: %v", err)
+		return nil, err
+	}
+	message = fmt.Sprintf("Successfully flipped exp flag to: %v", args.ExpRate)
+	return &message, nil
 }
 
 func (r *Resolver) AddLevelTable(ctx context.Context, args struct{ Levels []models.Level }) ([]*levelResolver, error) {
@@ -102,6 +126,38 @@ func (r *Resolver) AddNewEquipmentSheet(ctx context.Context, args struct{ Equipm
 		return nil, err
 	}
 	return id, nil
+}
+
+func (r *Resolver) AddNewParty(ctx context.Context, args struct{ Id string }) (*string, error) {
+	partyAddMessage, err := r.Services.Adventure.CreateParty(args.Id)
+	if err != nil {
+		r.Log.Errorf("error adding new party: %v", err)
+		return nil, err
+	}
+	return partyAddMessage, nil
+}
+
+func (r *Resolver) JoinParty(ctx context.Context, args struct {
+	Id      string
+	PartyId string
+}) (*string, error) {
+	partyMessage, err := r.Services.Adventure.JoinParty(args.PartyId, args.Id)
+	if err != nil {
+		r.Log.Errorf("error joining the party: %v", err)
+		return nil, err
+	}
+	return partyMessage, nil
+}
+
+func (r *Resolver) LeaveParty(ctx context.Context, args struct {
+	Id string
+}) (*string, error) {
+	partyMessage, err := r.Services.Adventure.LeaveParty(args.Id)
+	if err != nil {
+		r.Log.Errorf("error leaving the party: %v", err)
+		return nil, err
+	}
+	return partyMessage, nil
 }
 
 func (r *Resolver) GetAreaList(ctx context.Context) (*[]*areaResolver, error) {
@@ -178,7 +234,7 @@ func (r *Resolver) JobAdvance(ctx context.Context, args struct {
 	Class  string
 	Weapon string
 }) (*string, error) {
-	message, err := r.Services.Adventure.ClassAdvance(args.Id, strings.Title(strings.ToLower(args.Weapon)), strings.Title(strings.ToLower(args.Class)))
+	message, err := r.Services.Adventure.ClassAdvance(args.Id, strings.Title(strings.ToLower(args.Weapon)), strings.Title(strings.ToLower(args.Class)), nil)
 	if err != nil {
 		r.Log.Errorf("error class advancing: %v", err)
 		return nil, err

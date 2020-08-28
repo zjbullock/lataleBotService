@@ -7,5 +7,5 @@ input Equipment {
     Glasses: Int
     Earring: Int
     Ring: Int
-    Mantle: Int
+    Cloak: Int
 }

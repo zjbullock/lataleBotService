@@ -5,15 +5,15 @@ import (
 	"context"
 	"github.com/juju/loggo"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 	"lataleBotService/models"
 	"time"
 )
 
 type Datasource interface {
-	OpenConnection() error
-	CloseConnection() error
+	//OpenConnection() error
+	//CloseConnection() error
 	InsertDocument(collection string, data interface{}) (*string, error)
+	DeleteDocument(collection, id string) (*time.Time, error)
 	InsertDocumentWithID(collection, id string, data interface{}) (*time.Time, error)
 	UpdateDocument(collection, profileId string, data interface{}) (*time.Time, error)
 	UpdateDocumentField(collection, profileId string, updates []Update) (*time.Time, error)
@@ -22,39 +22,56 @@ type Datasource interface {
 }
 
 type fireStoreDB struct {
-	log       loggo.Logger
-	ctx       context.Context
-	Client    *Client
-	projectId string
+	log    loggo.Logger
+	ctx    context.Context
+	Client *Client
 }
 
 // NewDataSource returns a Datasource interface
-func NewDataSource(l loggo.Logger, ctx context.Context, projectId string) Datasource {
+//func NewDataSource(l loggo.Logger, ctx context.Context, projectId string) Datasource {
+//	return &fireStoreDB{
+//		log:       l,
+//		ctx:       ctx,
+//		Client:    nil,
+//		projectId: projectId,
+//	}
+//}
+
+func NewDataSource(l loggo.Logger, ctx context.Context, client *Client) Datasource {
 	return &fireStoreDB{
-		log:       l,
-		ctx:       ctx,
-		Client:    nil,
-		projectId: projectId,
+		log:    l,
+		ctx:    ctx,
+		Client: client,
 	}
 }
 
-func (f *fireStoreDB) OpenConnection() error {
-	client, err := NewClient(f.ctx, f.projectId, option.WithCredentialsFile("./credentials.json"))
-	if err != nil {
-		f.log.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", f.projectId, err)
-		return err
-	}
-	f.Client = client
-	return nil
-}
+//
+//func (f *fireStoreDB) OpenConnection() error {
+//	client, err := NewClient(f.ctx, f.projectId, option.WithCredentialsFile("./credentials-prod.json"), option.WithGRPCConnectionPool(10))
+//	if err != nil {
+//		f.log.Errorf("error initializing Fire Store client. Received error: %v", err)
+//		return err
+//	}
+//	f.Client = client
+//	return nil
+//}
+//
+//func (f *fireStoreDB) CloseConnection() error {
+//	err := f.Client.Close()
+//	if err != nil {
+//		f.log.Errorf("error closing the Fire Store client.  Received error: %v", err)
+//		return err
+//	}
+//	return nil
+//}
 
-func (f *fireStoreDB) CloseConnection() error {
-	err := f.Client.Close()
+func (f *fireStoreDB) DeleteDocument(collection, id string) (*time.Time, error) {
+	wr, err := f.Client.Collection(collection).Doc(id).Delete(f.ctx)
 	if err != nil {
-		f.log.Errorf("error closing the Fire Store client with projectId: %s.  Received error: %v", f.projectId, err)
-		return err
+		f.log.Errorf("error deleting document %s in collection: %s with error: %v", id, collection, err)
+		return nil, err
 	}
-	return nil
+	return &wr.UpdateTime, nil
 }
 
 func (f *fireStoreDB) InsertDocumentWithID(collection, id string, data interface{}) (*time.Time, error) {

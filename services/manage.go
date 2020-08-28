@@ -18,6 +18,7 @@ type Manage interface {
 	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
 	CreateExpTable(levels []models.Level) (*[]models.Level, error)
+	ToggleExpEvent(expRate int) error
 	AddNewEquipmentSheet(equipment models.EquipmentSheet) (*string, error)
 }
 
@@ -27,18 +28,31 @@ type manage struct {
 	levels    repositories.LevelRepository
 	users     repositories.UserRepository
 	equipment repositories.EquipmentRepository
+	config    repositories.ConfigRepository
 	log       loggo.Logger
 }
 
-func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, log loggo.Logger) Manage {
+func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, log loggo.Logger) Manage {
 	return &manage{
 		areas:     areas,
 		classes:   classes,
 		levels:    levels,
 		users:     users,
 		equipment: equip,
+		config:    config,
 		log:       log,
 	}
+}
+
+func (m *manage) ToggleExpEvent(expRate int) error {
+	expMap := make(map[string]int)
+	expMap["exp"] = expRate
+	_, err := m.config.UpdateDocument(expMap, "exp")
+	if err != nil {
+		m.log.Errorf("error toggling exp flag: %v", err)
+		return err
+	}
+	return nil
 }
 
 func (m *manage) IncreaseLevelCap(level int) (*[]models.Level, error) {
@@ -114,7 +128,7 @@ func (m *manage) AddNewArea(area models.Area) (*string, error) {
 
 func (m *manage) AddNewMonster(area *models.Area, monster models.Monster) (*string, error) {
 	area.Monsters = append(area.Monsters, monster)
-	time, err := m.areas.UpdateDocument(area.Name, area)
+	time, err := m.areas.UpdateDocument(area.ID, area)
 	if err != nil {
 		m.log.Errorf("error updating area with new monster: %v", err)
 		return nil, err
@@ -186,7 +200,7 @@ func (m *manage) calculateExpTable(level int) []models.Level {
 		if i == 1 {
 			levels = append(levels, models.Level{Value: 1, Exp: 0})
 		} else {
-			levels = append(levels, models.Level{Value: int32(i), Exp: float64(m.calculateExpForLevel(i))})
+			levels = append(levels, models.Level{Value: int32(i), Exp: int32(m.calculateExpForLevel(i))})
 		}
 	}
 	return levels
@@ -198,8 +212,8 @@ func (m *manage) calculateExpForLevel(level int) int {
 }
 
 func (m *manage) generateNewUser(user models.User, class, weapon string) models.User {
-	newClass := make(map[string]models.ClassInfo)
-	newClass[strings.Title(strings.ToLower(user.CurrentClass))] = models.ClassInfo{
+	newClass := make(map[string]*models.ClassInfo)
+	newClass[strings.Title(strings.ToLower(user.CurrentClass))] = &models.ClassInfo{
 		Name:          class,
 		Level:         1,
 		Exp:           0,

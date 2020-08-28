@@ -30,13 +30,13 @@ func NewEquipmentRepo(log loggo.Logger, ds datasource.Datasource) EquipmentRepos
 
 func (e *equipment) InsertDocument(id *string, data interface{}) (*string, error) {
 	if id != nil {
-		err := e.ds.OpenConnection()
-		if err != nil {
-			e.log.Errorf("error opening connection to the datasource: %v", err)
-			return nil, err
-		}
-		defer e.ds.CloseConnection()
-		_, err = e.ds.InsertDocumentWithID(globals.EQUIPMENT, *id, data)
+		//err := e.ds.OpenConnection()
+		//if err != nil {
+		//	e.log.Errorf("error opening connection to the datasource: %v", err)
+		//	return nil, err
+		//}
+		//defer e.ds.CloseConnection()
+		_, err := e.ds.InsertDocumentWithID(globals.EQUIPMENT, *id, data)
 		if err != nil {
 			e.log.Errorf("error Inserting Document: %v", err)
 			return nil, err
@@ -53,12 +53,12 @@ func (e *equipment) InsertDocument(id *string, data interface{}) (*string, error
 }
 
 func (e *equipment) ReadDocument(id string) (equipment *models.EquipmentSheet, err error) {
-	err = e.ds.OpenConnection()
-	if err != nil {
-		e.log.Errorf("error opening ds connection: %v", err)
-		return nil, err
-	}
-	defer e.ds.CloseConnection()
+	//err = e.ds.OpenConnection()
+	//if err != nil {
+	//	e.log.Errorf("error opening ds connection: %v", err)
+	//	return nil, err
+	//}
+	//defer e.ds.CloseConnection()
 
 	doc, err := e.ds.ReadDocument(globals.EQUIPMENT, id)
 	if err != nil {
@@ -76,12 +76,12 @@ func (e *equipment) ReadDocument(id string) (equipment *models.EquipmentSheet, e
 }
 
 func (e *equipment) QueryDocuments(args *[]models.QueryArg) (equipment *models.EquipmentSheet, err error) {
-	err = e.ds.OpenConnection()
-	if err != nil {
-		e.log.Errorf("failed to open datasource connection")
-		return nil, err
-	}
-	defer e.ds.CloseConnection()
+	//err = e.ds.OpenConnection()
+	//if err != nil {
+	//	e.log.Errorf("failed to open datasource connection")
+	//	return nil, err
+	//}
+	//defer e.ds.CloseConnection()
 	docs, err := e.ds.QueryCollection(globals.EQUIPMENT, args)
 	if err != nil {
 		e.log.Errorf("error querying for documents with error: %v", err)

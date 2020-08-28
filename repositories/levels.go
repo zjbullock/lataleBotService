@@ -31,17 +31,17 @@ func NewLevelRepo(log loggo.Logger, ds datasource.Datasource) LevelRepository {
 
 func (l *level) InsertDocument(id *string, level models.Level) (*models.Level, error) {
 	if id != nil {
-		err := l.ds.OpenConnection()
-		if err != nil {
-			l.log.Errorf("error opening connection to the datasource: %v", err)
-			return nil, err
-		}
-		defer l.ds.CloseConnection()
-		_, err = l.ds.InsertDocumentWithID(globals.LEVELS, *id, level)
-		if err != nil {
-			l.log.Errorf("error Inserting Document: %v", err)
-			return nil, err
-		}
+		//err := l.ds.OpenConnection()
+		//if err != nil {
+		//	l.log.Errorf("error opening connection to the datasource: %v", err)
+		//	return nil, err
+		//}
+		//defer l.ds.CloseConnection()
+		//_, err = l.ds.InsertDocumentWithID(globals.LEVELS, *id, level)
+		//if err != nil {
+		//	l.log.Errorf("error Inserting Document: %v", err)
+		//	return nil, err
+		//}
 		return &level, nil
 	} else {
 		_, err := l.ds.InsertDocument(globals.LEVELS, level)
@@ -54,12 +54,12 @@ func (l *level) InsertDocument(id *string, level models.Level) (*models.Level, e
 }
 
 func (l *level) ReadDocument(id string) (level *models.Level, err error) {
-	err = l.ds.OpenConnection()
-	if err != nil {
-		l.log.Errorf("error opening ds connection: %v", err)
-		return nil, err
-	}
-	defer l.ds.CloseConnection()
+	//err = l.ds.OpenConnection()
+	//if err != nil {
+	//	l.log.Errorf("error opening ds connection: %v", err)
+	//	return nil, err
+	//}
+	//defer l.ds.CloseConnection()
 
 	doc, err := l.ds.ReadDocument(globals.LEVELS, id)
 	if err != nil {
@@ -77,12 +77,12 @@ func (l *level) ReadDocument(id string) (level *models.Level, err error) {
 }
 
 func (l *level) QueryDocuments(collection string, args *[]models.QueryArg) (map[string]*models.Level, error) {
-	err := l.ds.OpenConnection()
-	if err != nil {
-		l.log.Errorf("failed to open datasource connection")
-		return nil, err
-	}
-	defer l.ds.CloseConnection()
+	//err := l.ds.OpenConnection()
+	//if err != nil {
+	//	l.log.Errorf("failed to open datasource connection")
+	//	return nil, err
+	//}
+	//defer l.ds.CloseConnection()
 	docs, err := l.ds.QueryCollection(collection, args)
 	if err != nil {
 		l.log.Errorf("error querying for documents with error: %v", err)
@@ -104,12 +104,12 @@ func (l *level) QueryDocuments(collection string, args *[]models.QueryArg) (map[
 }
 
 func (l *level) UpdateDocument(docId string, data interface{}) (*time.Time, error) {
-	err := l.ds.OpenConnection()
-	if err != nil {
-		l.log.Errorf("failed to open datasource connection")
-		return nil, err
-	}
-	defer l.ds.CloseConnection()
+	//err := l.ds.OpenConnection()
+	//if err != nil {
+	//	l.log.Errorf("failed to open datasource connection")
+	//	return nil, err
+	//}
+	//defer l.ds.CloseConnection()
 	updateTS, err := l.ds.UpdateDocument(globals.LEVELS, docId, data)
 	if err != nil {
 		l.log.Errorf("failed to update doc: %s with data: %v.  Received err: %v", docId, data, err)

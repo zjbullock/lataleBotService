@@ -1,4 +1,5 @@
-credentials.json
+credentials-prod.json
+credentials-qa.json
 .idea/**
 vendor/
 *.exe

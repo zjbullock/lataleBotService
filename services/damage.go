@@ -74,6 +74,18 @@ func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobCla
 			tier := 0
 			if userLevel/20 >= 2 && skillTier >= 81 {
 				tier = 2
+				if userLevel/20 >= 4 && jobClass.Tier >= 2 {
+					tierThree := randGenerator.Intn(100)
+					if tierThree > 50 {
+						tier = 3
+						if userLevel/20 >= 6 && jobClass.Tier >= 3 {
+							tierFour := randGenerator.Intn(100)
+							if tierFour > 50 {
+								tier = 4
+							}
+						}
+					}
+				}
 			} else if userLevel/20 >= 1 && skillTier <= 70 && skillTier >= 51 {
 				tier = 1
 			}
