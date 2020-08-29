@@ -13,7 +13,7 @@ import (
 
 type Manage interface {
 	AddNewUser(user models.User, weapon string) (*string, *string, error)
-	AddNewClass(class models.JobClass) (*string, error)
+	AddNewClass(class *models.JobClass) (*string, error)
 	AddNewArea(area models.Area) (*string, error)
 	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
@@ -137,7 +137,7 @@ func (m *manage) AddNewMonster(area *models.Area, monster models.Monster) (*stri
 	return &insertTime, nil
 }
 
-func (m *manage) AddNewClass(class models.JobClass) (*string, error) {
+func (m *manage) AddNewClass(class *models.JobClass) (*string, error) {
 	id, err := m.classes.InsertDocument(&class.Name, class)
 	if err != nil {
 		m.log.Errorf("error adding class: %v", err)

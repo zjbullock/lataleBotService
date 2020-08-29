@@ -30,12 +30,6 @@ func NewClassRepo(log loggo.Logger, ds datasource.Datasource) ClassRepository {
 
 func (c *character) InsertDocument(id *string, data interface{}) (*string, error) {
 	if id != nil {
-		//err := c.ds.OpenConnection()
-		//if err != nil {
-		//	c.log.Errorf("error opening connection to the datasource: %v", err)
-		//	return nil, err
-		//}
-		//defer c.ds.CloseConnection()
 		_, err := c.ds.InsertDocumentWithID(globals.CLASSES, *id, data)
 		if err != nil {
 			c.log.Errorf("error Inserting Document: %v", err)

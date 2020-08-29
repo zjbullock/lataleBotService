@@ -457,13 +457,17 @@ func (a *adventure) ClassAdvance(id, weapon, class string, givenClass *string) (
 	for _, wep := range classInfo.Weapons {
 		if wep.Name == weapon {
 			if *classInfo.ClassRequirement == user.CurrentClass || *classInfo.ClassRequirement == *givenClass {
+				classToUse := user.CurrentClass
+				if givenClass != nil {
+					classToUse = *givenClass
+				}
 				if classInfo.LevelRequirement <= user.ClassMap[user.CurrentClass].Level {
 					user.ClassMap[class] = &models.ClassInfo{
 						Name:          classInfo.Name,
-						Level:         user.ClassMap[user.CurrentClass].Level,
-						Exp:           user.ClassMap[user.CurrentClass].Exp,
+						Level:         user.ClassMap[classToUse].Level,
+						Exp:           user.ClassMap[classToUse].Exp,
 						CurrentWeapon: weapon,
-						Equipment:     a.determineStartingGear(classInfo.Tier, user.ClassMap[user.CurrentClass].Equipment),
+						Equipment:     a.determineStartingGear(classInfo.Tier, user.ClassMap[classToUse].Equipment),
 					}
 					user.CurrentClass = classInfo.Name
 					_, err := a.users.UpdateDocument(user.ID, user)
@@ -1195,16 +1199,16 @@ combat:
 		}
 		for i, user := range users {
 			userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
-			if user.CurrentHP == int(user.StatModifier.HP) {
-
-			} else if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
-				user.CurrentHP = int(user.CurrentHP)
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
-			} else {
-				user.CurrentHP += userHeal
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+			if user.CurrentHP != int(user.StatModifier.HP) && user.StatModifier.Recovery > 0.0 {
+				if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
+					user.CurrentHP = int(user.CurrentHP)
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+				} else {
+					user.CurrentHP += userHeal
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+				}
 			}
 			users[i].CurrentHP = user.CurrentHP
 
@@ -1342,15 +1346,16 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			break
 		}
 		userHeal := int(userStats.HP * userStats.Recovery)
-		if currentHP == int(userStats.HP) {
-		} else if userHeal+currentHP > int(userStats.HP) {
-			currentHP = int(userStats.HP)
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
-		} else {
-			currentHP += userHeal
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
+		if userStats.Recovery > 0.0 && currentHP != int(userStats.HP) {
+			if userHeal+currentHP > int(userStats.HP) {
+				currentHP = int(userStats.HP)
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
+			} else {
+				currentHP += userHeal
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
+			}
 		}
 
 		if monster.Stats.Recovery > 0.0 {

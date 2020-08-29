@@ -99,7 +99,7 @@ func (r *Resolver) AddNewArea(ctx context.Context, args struct{ Area models.Area
 }
 
 func (r *Resolver) AddNewClass(ctx context.Context, args struct{ Class models.JobClass }) (*string, error) {
-	id, err := r.Services.Manage.AddNewClass(args.Class)
+	id, err := r.Services.Manage.AddNewClass(&args.Class)
 	if err != nil {
 		r.Log.Errorf("error adding new class: %v", err)
 		return nil, err

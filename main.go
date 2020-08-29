@@ -20,7 +20,6 @@ import (
 
 var (
 	ctx          = context.Background()
-	client       *Client
 	l            loggo.Logger
 	handlerFuncs *handler.Funcs
 	ds           datasource.Datasource

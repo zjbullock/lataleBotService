@@ -45,26 +45,6 @@ func NewDataSource(l loggo.Logger, ctx context.Context, client *Client) Datasour
 	}
 }
 
-//
-//func (f *fireStoreDB) OpenConnection() error {
-//	client, err := NewClient(f.ctx, f.projectId, option.WithCredentialsFile("./credentials-prod.json"), option.WithGRPCConnectionPool(10))
-//	if err != nil {
-//		f.log.Errorf("error initializing Fire Store client. Received error: %v", err)
-//		return err
-//	}
-//	f.Client = client
-//	return nil
-//}
-//
-//func (f *fireStoreDB) CloseConnection() error {
-//	err := f.Client.Close()
-//	if err != nil {
-//		f.log.Errorf("error closing the Fire Store client.  Received error: %v", err)
-//		return err
-//	}
-//	return nil
-//}
-
 func (f *fireStoreDB) DeleteDocument(collection, id string) (*time.Time, error) {
 	wr, err := f.Client.Collection(collection).Doc(id).Delete(f.ctx)
 	if err != nil {
@@ -81,6 +61,7 @@ func (f *fireStoreDB) InsertDocumentWithID(collection, id string, data interface
 		f.log.Errorf("error inserting document into collection: %s with error: %v", collection, err)
 		return nil, err
 	}
+	f.log.Debugf("wr: %v", wr)
 	return &wr.UpdateTime, nil
 }
 
