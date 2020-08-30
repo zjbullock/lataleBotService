@@ -39,9 +39,9 @@ jobs:
       uses: finnp/create-file-action@1.0.0
       env:
         # file
-        FILE_NAME: "origins.json"
+        FILE_NAME: "config.json"
         # creds
-        FILE_DATA: ${{ secrets.APP_ORIGINS_PROD }}
+        FILE_DATA: ${{ secrets.APP_CONFIG_PROD }}
 
     - name: Google Cloud Platform (GCP) CLI - gcloud
       uses: actions-hub/gcloud@272.0.0
