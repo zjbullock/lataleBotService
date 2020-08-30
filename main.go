@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	l.SetLogLevel(loggo.DEBUG)
+	l.SetLogLevel(loggo.ERROR)
 	serv := server.NewServer(l)
 	schemaString, err := serv.GetSchema("./server/graphql/", l)
 	if err != nil {
@@ -44,7 +44,7 @@ func init() {
 	l.Errorf("configFile: %v", configFile)
 	defer configFile.Close()
 	var configMap map[string]interface{}
-	byteValue, _ := ioutil.ReadAll(configFile)
+	byteValue, err := ioutil.ReadAll(configFile)
 	json.Unmarshal([]byte(byteValue), &configMap)
 	l.Debugf("configMap: %v", configMap)
 	client, err := NewClient(ctx, configMap["project_id"].(string), option.WithCredentialsFile("./credentials.json"), option.WithGRPCConnectionPool(10))
