@@ -1439,8 +1439,16 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 				return userClassInfo, adventureLog, err
 			}
 			possibleJobs := *advanceJobs
+			jobText := ""
+			for i, job := range possibleJobs {
+				if i == 0 {
+					jobText += job.Name
+				} else {
+					jobText = "either " + jobText + " or " + job.Name
+				}
+			}
 			if advanceJobs != nil {
-				adventureLog = append(adventureLog, fmt.Sprintf("Congratulations!  Now that you've reached level 50, you may use the **-classAdvance <Class> <Weapon>** command to advance to either ***%s*** or ***%s***", possibleJobs[0].Name, possibleJobs[1].Name))
+				adventureLog = append(adventureLog, fmt.Sprintf("Congratulations!  Now that you've reached level 50, you may use the **-classAdvance <Class> <Weapon>** command to advance to ***%s***", jobText))
 			}
 		}
 		if levelCap == userClassInfo.Level {
