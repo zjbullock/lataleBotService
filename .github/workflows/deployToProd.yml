@@ -32,7 +32,7 @@ jobs:
         # file
         FILE_NAME: "credentials.json"
         # creds
-        FILE_BASE64: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
+        FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
 
 
     - name: Create Config File
