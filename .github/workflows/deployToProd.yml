@@ -41,7 +41,7 @@ jobs:
         # file
         FILE_NAME: "origins.json"
         # creds
-        FILE_DATA: ${{ APP_ORIGINS_PROD }}
+        FILE_DATA: ${{ secrets.APP_ORIGINS_PROD }}
 
     - name: Google Cloud Platform (GCP) CLI - gcloud
       uses: actions-hub/gcloud@272.0.0
