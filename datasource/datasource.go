@@ -27,16 +27,6 @@ type fireStoreDB struct {
 	Client *Client
 }
 
-// NewDataSource returns a Datasource interface
-//func NewDataSource(l loggo.Logger, ctx context.Context, projectId string) Datasource {
-//	return &fireStoreDB{
-//		log:       l,
-//		ctx:       ctx,
-//		Client:    nil,
-//		projectId: projectId,
-//	}
-//}
-
 func NewDataSource(l loggo.Logger, ctx context.Context, client *Client) Datasource {
 	return &fireStoreDB{
 		log:    l,
