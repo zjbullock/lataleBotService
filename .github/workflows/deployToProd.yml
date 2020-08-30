@@ -27,7 +27,7 @@ jobs:
     - name: Build
       run: go build -v .
 
-    - name: Create File
+    - name: Create Firebase Credentials File
       uses: finnp/create-file-action@1.0.0
       env:
         # file
@@ -35,13 +35,13 @@ jobs:
         # creds
         FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}
         
-    - name: Create File
+    - name: Create Origins File
       uses: finnp/create-file-action@1.0.0
       env:
         # file
         FILE_NAME: "origins.json"
         # creds
-        FILE_DATA: ${{ ORIGINS_PROD }}
+        FILE_DATA: ${{ APP_ORIGINS_PROD }}
 
     - name: Google Cloud Platform (GCP) CLI - gcloud
       uses: actions-hub/gcloud@272.0.0
