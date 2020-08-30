@@ -3,12 +3,13 @@ package main
 import (
 	. "cloud.google.com/go/firestore"
 	"context"
+	"encoding/json"
 	"github.com/gorilla/handlers"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/juju/loggo"
 	"google.golang.org/api/option"
+	"io/ioutil"
 	"lataleBotService/datasource"
-	"lataleBotService/globals"
 	"lataleBotService/handler"
 	"lataleBotService/repositories"
 	"lataleBotService/resolvers"
@@ -16,6 +17,7 @@ import (
 	"lataleBotService/server"
 	"lataleBotService/services"
 	"net/http"
+	"os"
 )
 
 var (
@@ -32,9 +34,18 @@ func init() {
 	if err != nil {
 		l.Criticalf("error occurred while fetching graphql schema: %v", err)
 	}
-	client, err := NewClient(ctx, globals.PROJECTID, option.WithCredentialsFile("./credentials-prod.json"), option.WithGRPCConnectionPool(10))
+	credFile, err := os.Open("./credentials.json")
 	if err != nil {
-		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", globals.PROJECTID, err)
+		l.Errorf("error opening credentials file: %v", err)
+		return
+	}
+	defer credFile.Close()
+	var credMap map[string]interface{}
+	byteValue, _ := ioutil.ReadAll(credFile)
+	json.Unmarshal([]byte(byteValue), &credMap)
+	client, err := NewClient(ctx, credMap["project_id"].(string), option.WithCredentialsJSON(byteValue), option.WithGRPCConnectionPool(10))
+	if err != nil {
+		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", credMap["project_id"].(string), err)
 		return
 	}
 	//ds = datasource.NewDataSource(l, ctx, globals.PROJECTID)
