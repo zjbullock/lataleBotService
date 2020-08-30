@@ -26,6 +26,7 @@ var (
 	l            loggo.Logger
 	handlerFuncs *handler.Funcs
 	ds           datasource.Datasource
+	originList   []string
 )
 
 func init() {
@@ -35,19 +36,19 @@ func init() {
 	if err != nil {
 		l.Criticalf("error occurred while fetching graphql schema: %v", err)
 	}
-	credFile, err := os.Open("./credentials.json")
+	configFile, err := os.Open("./config.json")
 	if err != nil {
 		l.Errorf("error opening credentials file: %v", err)
 		return
 	}
-	l.Errorf("credFile: %v", credFile)
-	defer credFile.Close()
-	var credMap map[string]interface{}
-	byteValue, _ := ioutil.ReadAll(credFile)
-	json.Unmarshal([]byte(byteValue), &credMap)
-	client, err := NewClient(ctx, credMap["project_id"].(string), option.WithCredentialsJSON(byteValue), option.WithGRPCConnectionPool(10))
+	l.Errorf("configFile: %v", configFile)
+	defer configFile.Close()
+	var configMap map[string]interface{}
+	byteValue, _ := ioutil.ReadAll(configFile)
+	json.Unmarshal([]byte(byteValue), &configMap)
+	client, err := NewClient(ctx, configMap["project_id"].(string), option.WithCredentialsFile("./credentials.json"), option.WithGRPCConnectionPool(10))
 	if err != nil {
-		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", credMap["project_id"].(string), err)
+		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", configMap["project_id"].(string), err)
 		return
 	}
 	ds = datasource.NewDataSource(l, ctx, client)
@@ -85,20 +86,12 @@ func init() {
 		}),
 	}
 
+	origins := configMap["origins"].(string)
+	originList = strings.Split(origins, ",")
 }
 
 func main() {
 	r := router.NewRouter(handlerFuncs)
-	originsFile, err := os.Open("./origins.json")
-	if err != nil {
-		l.Errorf("error opening origins file: %v", err)
-		return
-	}
-	var allowedMaps map[string]interface{}
-	allowByteValues, _ := ioutil.ReadAll(originsFile)
-	json.Unmarshal([]byte(allowByteValues), &allowedMaps)
-	origins := allowedMaps["origins"].(string)
-	originList := strings.Split(origins, ",")
 	allowedHeaders := handlers.AllowedHeaders([]string{"Content-Type"})
 	allowedOrigins := handlers.AllowedOrigins(originList)
 	allowedMethods := handlers.AllowedMethods([]string{http.MethodPost, http.MethodOptions, http.MethodGet})
