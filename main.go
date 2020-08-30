@@ -40,6 +40,7 @@ func init() {
 		l.Errorf("error opening credentials file: %v", err)
 		return
 	}
+	l.Debugf("credFile: %v", credFile)
 	defer credFile.Close()
 	var credMap map[string]interface{}
 	byteValue, _ := ioutil.ReadAll(credFile)
