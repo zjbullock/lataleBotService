@@ -48,7 +48,6 @@ func init() {
 		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", credMap["project_id"].(string), err)
 		return
 	}
-	//ds = datasource.NewDataSource(l, ctx, globals.PROJECTID)
 	ds = datasource.NewDataSource(l, ctx, client)
 	repos := struct {
 		area    repositories.AreasRepository
