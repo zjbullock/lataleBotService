@@ -25,24 +25,25 @@ jobs:
         fi
     - name: Build
       run: go build -v .
-    - name: create-credentials-json
-  # You may pin to the exact commit or the version.
-  # uses: jsdaniell/create-json@a9c0d73454946d6a37d61077f0ed847259a1abc4
-      uses: jsdaniell/create-json@alpha-v1
-      with:
-    # The name of the file to be written.
-        name: "credentials.json"
-    # The json string that can be a secret of the github repo.
-        json-string: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}
-    - name: create-config-json
-  # You may pin to the exact commit or the version.
-  # uses: jsdaniell/create-json@a9c0d73454946d6a37d61077f0ed847259a1abc4
-      uses: jsdaniell/create-json@alpha-v1
-      with:
-    # The name of the file to be written.
-        name: "config.json"
-    # The json string that can be a secret of the github repo.
-        json-string: ${{ secrets.APP_CONFIG_PROD }}
+ 
+    - name: Create Credentials File
+      uses: finnp/create-file-action@1.0.0
+      env:
+        # file
+        FILE_NAME: "credentials.json"
+        # creds
+        FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
+
+
+    - name: Create Config File
+      uses: finnp/create-file-action@1.0.0
+      env:
+        # file
+        FILE_NAME: "config.json"
+        # creds
+        FILE_DATA: ${{ secrets.APP_CONFIG_PROD }}  
+
+
     # Optional subfolder directory to save the json file.
     - name: Google Cloud Platform (GCP) CLI - gcloud
       uses: actions-hub/gcloud@272.0.0
