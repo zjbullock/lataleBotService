@@ -1,6 +1,7 @@
 credentials-prod.json
 credentials.json
 appengineauth.json
+origins.json
 credentials-qa.json
 .idea/**
 vendor/

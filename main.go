@@ -18,6 +18,7 @@ import (
 	"lataleBotService/services"
 	"net/http"
 	"os"
+	"strings"
 )
 
 var (
@@ -82,12 +83,23 @@ func init() {
 			Log:      l,
 		}),
 	}
+
 }
 
 func main() {
 	r := router.NewRouter(handlerFuncs)
-	allowedHeaders := handlers.AllowedHeaders([]string{"content-type"})
-	allowedOrigins := handlers.AllowedOrigins([]string{"*"})
-	allowedMethods := handlers.AllowedMethods([]string{http.MethodPost})
+	originsFile, err := os.Open("./origins.json")
+	if err != nil {
+		l.Errorf("error opening origins file: %v", err)
+		return
+	}
+	var allowedMaps map[string]interface{}
+	allowByteValues, _ := ioutil.ReadAll(originsFile)
+	json.Unmarshal([]byte(allowByteValues), &allowedMaps)
+	origins := allowedMaps["origins"].(string)
+	originList := strings.Split(origins, ",")
+	allowedHeaders := handlers.AllowedHeaders([]string{"Content-Type"})
+	allowedOrigins := handlers.AllowedOrigins(originList)
+	allowedMethods := handlers.AllowedMethods([]string{http.MethodPost, http.MethodOptions, http.MethodGet})
 	l.Criticalf(http.ListenAndServe(":8080", handlers.CORS(allowedOrigins, allowedMethods, allowedHeaders)(r)).Error())
 }
