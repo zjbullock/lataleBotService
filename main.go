@@ -46,6 +46,7 @@ func init() {
 	var configMap map[string]interface{}
 	byteValue, _ := ioutil.ReadAll(configFile)
 	json.Unmarshal([]byte(byteValue), &configMap)
+	l.Errorf("configMap: %v", configMap)
 	client, err := NewClient(ctx, configMap["project_id"].(string), option.WithCredentialsFile("./credentials.json"), option.WithGRPCConnectionPool(10))
 	if err != nil {
 		l.Errorf("error initializing Fire Store client with projectId: %s. Received error: %v", configMap["project_id"].(string), err)
