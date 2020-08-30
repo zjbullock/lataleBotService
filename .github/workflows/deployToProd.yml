@@ -26,13 +26,13 @@ jobs:
     - name: Build
       run: go build -v .
  
-    - name: Create Credentials File
-      uses: finnp/create-file-action@1.0.0
-      env:
-        # file
-        FILE_NAME: "credentials.json"
-        # creds
-        FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
+#     - name: Create Credentials File
+#       uses: finnp/create-file-action@1.0.0
+#       env:
+#         # file
+#         FILE_NAME: "credentials.json"
+#         # creds
+#         FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
 
 
     - name: Create Config File
@@ -41,8 +41,12 @@ jobs:
         # file
         FILE_NAME: "config.json"
         # creds
-        FILE_DATA: ${{ secrets.APP_CONFIG_PROD }}  
-
+        FILE_DATA: ${{ secrets.APP_CONFIG_PROD }}
+        
+    - name: Decode secrets.properties file
+      env:
+        SECRETS_PROPERTIES: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}
+      run: echo "$SECRETS_PROPERTIES" | base64 -d > ./credentials.json
 
     # Optional subfolder directory to save the json file.
     - name: Google Cloud Platform (GCP) CLI - gcloud
