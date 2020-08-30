@@ -33,14 +33,14 @@ jobs:
         # file
         FILE_NAME: "credentials.json"
         # creds
-        FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS }}  
+        FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
 
     - name: Google Cloud Platform (GCP) CLI - gcloud
       uses: actions-hub/gcloud@272.0.0
       env:
         # Project id
-        PROJECT_ID: ${{ secrets.GOOGLE_APPLICATION_PROJECT_ID }}
+        PROJECT_ID: ${{ secrets.GOOGLE_APPLICATION_PROJECT_ID_PROD }}
         # GCP authorization credentials
-        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_PROD }}
       with: 
         args: app deploy app.yaml --quiet
