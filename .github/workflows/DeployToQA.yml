@@ -57,4 +57,4 @@ jobs:
         # GCP authorization credentials
         APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_QA }}
       with: 
-          args: app deploy app.yaml --quiet
+          args: app deploy app-qa.yaml --quiet
