@@ -1195,6 +1195,7 @@ func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster
 	}
 	activeSkills := 1
 	enraged := false
+	adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ has encountered **%s**.", boss.Name))
 bossBattle:
 	for len(users) != 0 && bossCurrentHp != 0 {
 		for _, user := range users {

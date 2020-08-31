@@ -39,14 +39,15 @@ func (d *damage) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 	}
 	damageLog := ""
 	damage := float64(rand.Intn(int(boss.Stats.MaxDPS)-int(boss.Stats.MinDPS))) + boss.Stats.MinDPS
+	damageLog += fmt.Sprintf("__**%s**__ hit __**%s**__ ", boss.Name, user.User.Name)
 	if bossSkill != nil {
 		damage = damage * bossSkill.SkillDamageModifier
 		damageLog += fmt.Sprintf(bossSkill.Quote+"\n", user.User.Name)
 		if bossSkill.CrowdControl != nil {
 			user.CrowdControlled = bossSkill.CrowdControl
 		}
+		damageLog += fmt.Sprintf("with the skill ***%s*** ", bossSkill.Name)
 	}
-	damageLog += fmt.Sprintf("__**%s**__ hit __**%s**__ ", boss.Name, user.User.Name)
 	roundedDamage := ((int(damage) - int(user.StatModifier.Defense)) + int(math.Abs(damage-user.StatModifier.Defense))) / 2
 	criticalChance := randGenerator.Float64()
 	d.log.Debugf("%s Critical Chance: %v", boss.Name, criticalChance)
