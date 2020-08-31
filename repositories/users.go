@@ -53,13 +53,6 @@ func (u *user) InsertDocument(id *string, data interface{}) (*string, error) {
 }
 
 func (u *user) ReadDocument(id string) (userInfo *models.User, err error) {
-	//err = u.ds.OpenConnection()
-	//if err != nil {
-	//	u.log.Errorf("error opening ds connection: %v", err)
-	//	return nil, err
-	//}
-	//defer u.ds.CloseConnection()
-
 	doc, err := u.ds.ReadDocument(globals.USERS, id)
 	if err != nil {
 		u.log.Errorf("error reading user: %v", err)

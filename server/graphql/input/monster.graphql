@@ -5,4 +5,7 @@ input Monster {
     Ely: Int!
     Rank: Int!
     Stats: Stat!
+    BossBonus: Int
+    IdleTime: Float
+    Skills: [BossSkills!]
 }

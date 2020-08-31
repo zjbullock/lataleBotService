@@ -9,4 +9,5 @@ input Stat {
     HP: Float!
     SkillProcRate: Float!
     Recovery: Float!
+    SkillDamageModifier: Float!
 }

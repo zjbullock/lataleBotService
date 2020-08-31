@@ -8,5 +8,6 @@ type StatInfo {
     Evasion: Float
     HP: Int
     SkillProcRate: Float
+    SkillDamageModifier: Float
     Recovery: Float
 }

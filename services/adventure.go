@@ -30,6 +30,7 @@ type Adventure interface {
 	GetArea(id string) (*models.Area, *string, error)
 	GetAreas() (*[]models.Area, error)
 	GetUserInfo(id string) (*models.User, *string, error)
+	GetBossBattle(bossId, userId string) (*[]string, *string, error)
 }
 
 type adventure struct {
@@ -40,11 +41,12 @@ type adventure struct {
 	equipment repositories.EquipmentRepository
 	config    repositories.ConfigRepository
 	party     repositories.PartyRepository
+	boss      repositories.BossRepository
 	damage    Damage
 	log       loggo.Logger
 }
 
-func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, config repositories.ConfigRepository, party repositories.PartyRepository, log loggo.Logger) Adventure {
+func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, config repositories.ConfigRepository, party repositories.PartyRepository, boss repositories.BossRepository, log loggo.Logger) Adventure {
 	return &adventure{
 		areas:     areas,
 		classes:   classes,
@@ -54,6 +56,7 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 		config:    config,
 		party:     party,
 		damage:    NewDamageService(log),
+		boss:      boss,
 		log:       log,
 	}
 }
@@ -942,6 +945,35 @@ func (a *adventure) GetJobList() (*[]models.JobClass, error) {
 	return jobs, err
 }
 
+func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, error) {
+	user, err := a.users.ReadDocument(userId)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not yet selected a class, or created an account"
+		return nil, &message, nil
+	}
+	if user.Party == nil {
+		message := "You must be in a party to participate in Boss Fights!  Join a party, or create one using `!latale -createParty`."
+		return nil, &message, nil
+	}
+	boss, err := a.boss.ReadDocument(bossId)
+	if err != nil {
+		a.log.Errorf("error getting area info: %v", err)
+		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
+		return nil, &message, nil
+	}
+	partyMembers, err := a.generatePartyBlob(user)
+	if err != nil {
+		a.log.Errorf("error generating party blob: %v", err)
+	}
+	adventureLog, err := a.bossBattleLog(partyMembers, boss, user.ID)
+	if err != nil {
+		a.log.Errorf("error while generating boss log: %v", err)
+		return nil, nil, err
+	}
+	return &adventureLog, nil, nil
+}
+
 func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, error) {
 	/*
 		1.  Pull User Current stats
@@ -1030,6 +1062,38 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 }
 
 func (a *adventure) createPartyAdventureLog(user *models.User, area *models.Area) ([]string, error) {
+	var adventureLog []string
+	adventureLog, onCooldown := a.checkAdventureCooldown(user, adventureLog)
+	if onCooldown {
+		return adventureLog, nil
+	}
+	partyMemberInfos, err := a.generatePartyBlob(user)
+	if err != nil {
+		a.log.Errorf("error generating party blob: %v", err)
+		return nil, err
+	}
+	randSource := rand.NewSource(time.Now().UnixNano())
+	encounteredMonsters, err := a.generateMonsterBlob(area, randSource, len(partyMemberInfos))
+	if err != nil {
+		a.log.Errorf("error generating monster blob: %v", err)
+		return nil, err
+	}
+	adventureLog, err = a.partyBattleLog(partyMemberInfos, encounteredMonsters, adventureLog, user)
+	if err != nil {
+		a.log.Errorf("error creating adventurelog: %v", err)
+		return nil, err
+	}
+	return adventureLog, nil
+}
+
+func (a *adventure) generateMonsterBlob(area *models.Area, randSource rand.Source, partyMemberInfos int) ([]*models.MonsterBlob, error) {
+	monsterCount := 1
+	if partyMemberInfos > 1 {
+		randomMonsterCount := rand.New(randSource)
+		monsterCount = randomMonsterCount.Intn(partyMemberInfos) + 1
+	}
+	var encounteredMonsters []*models.MonsterBlob
+	rarityGenerator := rand.New(randSource)
 	var monsterMap = make(map[string]*[]models.Monster)
 	for _, monster := range area.Monsters {
 		if monsterMap[utils.String(monster.Rank)] == nil {
@@ -1039,13 +1103,26 @@ func (a *adventure) createPartyAdventureLog(user *models.User, area *models.Area
 		updatedList = append(updatedList, monster)
 		monsterMap[utils.String(monster.Rank)] = &updatedList
 	}
-
 	a.log.Debugf("monsters possible: %v", monsterMap)
-	var adventureLog []string
-	adventureLog, onCooldown := a.checkAdventureCooldown(user, adventureLog)
-	if onCooldown {
-		return adventureLog, nil
+	for i := 0; i < monsterCount; i++ {
+		monsters := a.determineMonsterRarity(monsterMap, rarityGenerator)
+		monster := a.determineMonster(*monsters, rarityGenerator)
+		monsterRank := ""
+		for i := int32(0); i < monster.Rank; i++ {
+			monsterRank += "!"
+		}
+		encounteredMonsters = append(encounteredMonsters, &models.MonsterBlob{
+			CurrentHP:    int32(monster.Stats.HP),
+			StatModifier: &monster.Stats,
+			Name:         monster.Name + " " + string('A'+i) + monsterRank,
+			Ely:          monster.Ely,
+			Exp:          monster.Exp,
+		})
 	}
+	return encounteredMonsters, nil
+}
+
+func (a *adventure) generatePartyBlob(user *models.User) ([]*models.UserBlob, error) {
 	party, err := a.party.ReadDocument(*user.Party)
 	if err != nil {
 		a.log.Errorf("encountered error generating adventure log: %v", err)
@@ -1078,35 +1155,7 @@ func (a *adventure) createPartyAdventureLog(user *models.User, area *models.Area
 			Weapon:       userInfo.ClassMap[userInfo.CurrentClass].CurrentWeapon,
 		})
 	}
-	randSource := rand.NewSource(time.Now().UnixNano())
-	monsterCount := 1
-	if len(partyMemberInfos) > 1 {
-		randomMonsterCount := rand.New(randSource)
-		monsterCount = randomMonsterCount.Intn(len(partyMemberInfos)) + 1
-	}
-	var encounteredMonsters []*models.MonsterBlob
-	rarityGenerator := rand.New(randSource)
-	for i := 0; i < monsterCount; i++ {
-		monsters := a.determineMonsterRarity(monsterMap, rarityGenerator)
-		monster := a.determineMonster(*monsters, rarityGenerator)
-		monsterRank := ""
-		for i := int32(0); i < monster.Rank; i++ {
-			monsterRank += "!"
-		}
-		encounteredMonsters = append(encounteredMonsters, &models.MonsterBlob{
-			CurrentHP:    int32(monster.Stats.HP),
-			StatModifier: &monster.Stats,
-			Name:         monster.Name + " " + string('A'+i) + monsterRank,
-			Ely:          monster.Ely,
-			Exp:          monster.Exp,
-		})
-	}
-	adventureLog, err = a.partyBattleLog(partyMemberInfos, encounteredMonsters, adventureLog, user)
-	if err != nil {
-		a.log.Errorf("error creating adventurelog: %v", err)
-		return nil, err
-	}
-	return adventureLog, nil
+	return partyMemberInfos, nil
 }
 
 func (a *adventure) checkAdventureCooldown(user *models.User, adventureLog []string) ([]string, bool) {
@@ -1129,6 +1178,160 @@ func (a *adventure) checkAdventureCooldown(user *models.User, adventureLog []str
 		return adventureLog, true
 	}
 	return adventureLog, false
+}
+
+func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster, primaryUserId string) ([]string, error) {
+	battleWin := false
+	randSource := rand.NewSource(time.Now().UnixNano())
+	randGenerator := rand.New(randSource)
+	bossMaxHp := int(boss.Stats.HP) * len(users)
+	bossCurrentHp := bossMaxHp
+	bossHPPercentage := float64(bossCurrentHp) / float64(bossMaxHp)
+	var adventureLog []string
+	//Set cooldowns of all boss skills to 0 for beginning.
+	for _, skill := range *boss.Skills {
+		curCd := int32(0)
+		skill.CurrentCoolDown = &curCd
+	}
+	activeSkills := 1
+	enraged := false
+bossBattle:
+	for len(users) != 0 && bossCurrentHp != 0 {
+		for _, user := range users {
+			if user.CrowdControlled != nil && *user.CrowdControlled != 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ is currently dazed for **%v turn(s)**.", user.User.Name, *user.CrowdControlled))
+			} else {
+				userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
+				bossCurrentHp = ((int(bossCurrentHp) - int(damage)) + int(math.Abs(float64(bossCurrentHp-damage)))) / 2
+				adventureLog = append(adventureLog, userLog)
+				bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100)))
+			}
+			if bossCurrentHp <= 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!", boss.Name))
+				battleWin = true
+				break bossBattle
+			}
+		}
+		phase, newActiveSkills := a.checkPhaseStatus(bossHPPercentage, boss, activeSkills)
+		if phase != "" && newActiveSkills != activeSkills {
+			adventureLog = append(adventureLog, phase)
+			activeSkills = newActiveSkills
+			if activeSkills == 4 {
+				enraged = true
+			}
+		}
+		active := randGenerator.Float64()
+		if active > *boss.IdleTime || enraged {
+			skills := *boss.Skills
+			var availableSkills []*models.BossSkill
+			for i := 0; i < activeSkills; i++ {
+				if *skills[i].CurrentCoolDown == 0 {
+					availableSkills = append(availableSkills, skills[i])
+				}
+			}
+			var skill *models.BossSkill
+			if len(availableSkills) != 0 {
+				skillGen := randGenerator.Intn(len(availableSkills))
+				skill = availableSkills[skillGen]
+				for _, usedSkill := range skills {
+					if usedSkill.Name == skill.Name {
+						usedSkill.CurrentCoolDown = &usedSkill.CoolDown
+					}
+				}
+			} else {
+				skill = nil
+			}
+			alivePlayers := users
+			if skill != nil && skill.AoE {
+				a.log.Debugf("users: %v", users)
+
+				for i, user := range users {
+					a.log.Debugf("user: %v", user)
+					bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *user, boss, skill)
+					user.CurrentHP = ((user.CurrentHP - int(damage)) + int(math.Abs(float64(user.CurrentHP-damage)))) / 2
+					adventureLog = append(adventureLog, bossDamageLog)
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", user.User.Name, user.CurrentHP, user.MaxHP))
+					if user.CurrentHP <= 0 {
+						a.log.Debugf("alivePlayers: %v", alivePlayers)
+						copy(alivePlayers[i:], alivePlayers[i+1:]) // Shift a[i+1:] left one index.
+						alivePlayers[len(alivePlayers)-1] = nil    // Erase last element (write zero value).
+						alivePlayers = alivePlayers[:len(alivePlayers)-1]
+						a.log.Debugf("alivePlayers: %v", alivePlayers)
+					}
+				}
+				users = alivePlayers
+
+			} else {
+				targetedUser := randGenerator.Intn(len(users))
+				bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *users[targetedUser], boss, skill)
+				users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
+				adventureLog = append(adventureLog, bossDamageLog)
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP))
+				if users[targetedUser].CurrentHP <= 0 {
+					adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", users[targetedUser].User.Name, boss.Name))
+					copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
+					users[len(users)-1] = nil                          // Erase last element (write zero value).
+					users = users[:len(users)-1]
+				}
+				a.log.Debugf("users: %v", users)
+			}
+			if len(users) == 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ was completely wiped out by __**%s**__ .", boss.Name))
+				break bossBattle
+			}
+			for _, skill := range skills {
+				if *skill.CurrentCoolDown > 0 {
+					curCoolDown := *skill.CurrentCoolDown
+					curCoolDown--
+					skill.CurrentCoolDown = &curCoolDown
+				}
+			}
+			boss.Skills = &skills
+		} else {
+			adventureLog = append(adventureLog, *boss.IdlePhrase)
+		}
+		a.log.Debugf("users: %v", users)
+		for i, user := range users {
+			if user.CrowdControlled != nil && *user.CrowdControlled > 0 {
+				crowdControlled := *user.CrowdControlled
+				crowdControlled--
+				user.CrowdControlled = &crowdControlled
+			}
+			userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
+			if user.CurrentHP != int(user.StatModifier.HP) && user.StatModifier.Recovery > 0.0 {
+				if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
+					user.CurrentHP = int(user.CurrentHP)
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+				} else {
+					user.CurrentHP += userHeal
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+				}
+			}
+			users[i].CurrentHP = user.CurrentHP
+
+		}
+	}
+	if battleWin {
+
+	}
+	return adventureLog, nil
+}
+
+func (a *adventure) checkPhaseStatus(bossPercent float64, boss *models.Monster, phaseCount int) (string, int) {
+	phases := *boss.Phases
+	if bossPercent <= 0.10 && phaseCount < 4 {
+		return phases[2], 4
+	}
+	if bossPercent <= 0.50 && phaseCount < 3 {
+		return phases[1], 3
+	}
+	if bossPercent <= 0.75 && phaseCount < 2 {
+		return phases[0], 2
+	}
+	return "", phaseCount
 }
 
 func (a *adventure) partyBattleLog(users []*models.UserBlob, encounteredMonsters []*models.MonsterBlob, adventureLog []string, primaryUser *models.User) ([]string, error) {
@@ -1161,7 +1364,7 @@ combat:
 		//Enemies will attack party members randomly.
 		//Battle continues until one side is no longer able to fight.
 		for _, user := range users {
-			userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, encounteredMonsters[0].Name, *user.StatModifier, *encounteredMonsters[0].StatModifier, &user.Weapon, user.JobClass, &user.UserLevel)
+			userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, encounteredMonsters[0].Name, *user.StatModifier, *encounteredMonsters[0].StatModifier, &user.Weapon, user.JobClass, &user.UserLevel, false)
 			currentMonsterHP := int(encounteredMonsters[0].CurrentHP)
 			currentMonsterHP = ((int(currentMonsterHP) - int(damage)) + int(math.Abs(float64(currentMonsterHP-damage)))) / 2
 			adventureLog = append(adventureLog, userLog)
@@ -1182,7 +1385,7 @@ combat:
 		for _, monster := range encounteredMonsters {
 			a.log.Debugf("users: %v", users)
 			targetedUser := randGenerator.Intn(len(users))
-			monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, users[targetedUser].User.Name, *monster.StatModifier, *users[targetedUser].StatModifier, nil, nil, nil)
+			monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, users[targetedUser].User.Name, *monster.StatModifier, *users[targetedUser].StatModifier, nil, nil, nil, false)
 			users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
 			adventureLog = append(adventureLog, monsterLog)
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP))
@@ -1328,7 +1531,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	userLevel := user.ClassMap[user.CurrentClass].Level
 	userWeapon := user.ClassMap[user.CurrentClass].CurrentWeapon
 	for currentHP != 0 && monsterHP != 0 {
-		userLog, damage := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, userStats, monster.Stats, &userWeapon, &classInfo, &userLevel)
+		userLog, damage := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, userStats, monster.Stats, &userWeapon, &classInfo, &userLevel, false)
 		monsterHP = ((int(monsterHP) - int(damage)) + int(math.Abs(float64(monsterHP-damage)))) / 2
 		adventureLog = append(adventureLog, userLog)
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", monster.Name, monsterHP, monsterMaxHp))
@@ -1337,7 +1540,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			battleWin = true
 			break
 		}
-		monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, user.Name, monster.Stats, userStats, nil, nil, nil)
+		monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, user.Name, monster.Stats, userStats, nil, nil, nil, false)
 		currentHP = ((int(currentHP) - int(damage)) + int(math.Abs(float64(currentHP-damage)))) / 2
 		adventureLog = append(adventureLog, monsterLog)
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", user.Name, currentHP, userMaxHP))
@@ -1503,6 +1706,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate),
 		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].StockingEvasion,
 		Accuracy:               getStaticStat(0.95, levelModifier, class.Accuracy) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Glove)].GloveAccuracy,
+		SkillDamageModifier:    class.SkillDamageModifier,
 	}
 }
 

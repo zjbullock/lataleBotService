@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	l.SetLogLevel(loggo.ERROR)
+	l.SetLogLevel(loggo.DEBUG)
 	serv := server.NewServer(l)
 	schemaString, err := serv.GetSchema("./server/graphql/", l)
 	if err != nil {
@@ -61,6 +61,7 @@ func init() {
 		equips  repositories.EquipmentRepository
 		config  repositories.ConfigRepository
 		party   repositories.PartyRepository
+		boss    repositories.BossRepository
 	}{
 		area:    repositories.NewAreaRepo(l, ds),
 		classes: repositories.NewClassRepo(l, ds),
@@ -69,14 +70,15 @@ func init() {
 		equips:  repositories.NewEquipmentRepo(l, ds),
 		config:  repositories.NewConfigRepo(l, ds),
 		party:   repositories.NewPartiesRepo(l, ds),
+		boss:    repositories.NewBossRepository(l, ds),
 	}
 	service := struct {
 		Adventure services.Adventure
 		Manage    services.Manage
 		Damage    services.Damage
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, l),
-		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, repos.boss, l),
+		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, repos.boss, l),
 		Damage:    services.NewDamageService(l),
 	}
 	handlerFuncs = &handler.Funcs{

@@ -15,13 +15,14 @@ type User struct {
 }
 
 type UserBlob struct {
-	JobClass     *JobClass
-	StatModifier *StatModifier
-	User         *User
-	CurrentHP    int
-	MaxHP        int
-	UserLevel    int32
-	Weapon       string
+	JobClass        *JobClass
+	StatModifier    *StatModifier
+	User            *User
+	CurrentHP       int
+	MaxHP           int
+	UserLevel       int32
+	Weapon          string
+	CrowdControlled *int32
 }
 
 type MonsterBlob struct {

@@ -9,7 +9,8 @@ import (
 )
 
 type Damage interface {
-	DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32) (string, int)
+	DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32, boss bool) (string, int)
+	DetermineBossDamage(randGenerator *rand.Rand, user models.UserBlob, boss *models.Monster, bossSkill *models.BossSkill) (string, int)
 }
 
 type damage struct {
@@ -22,7 +23,44 @@ func NewDamageService(log loggo.Logger) Damage {
 	}
 }
 
-func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32) (string, int) {
+func (d *damage) DetermineBossDamage(randGenerator *rand.Rand, user models.UserBlob, boss *models.Monster, bossSkill *models.BossSkill) (string, int) {
+	evasionChance := randGenerator.Float64()
+	accuracy := boss.Stats.Accuracy
+	if accuracy > 1.0 {
+		accuracy = 1.0
+	}
+	d.log.Debugf("users.StatModifier", user.StatModifier)
+	evasion := user.StatModifier.Evasion
+	if evasion > 1.0 {
+		evasion = 1.0
+	}
+	if evasionChance > accuracy-evasion {
+		return fmt.Sprintf("%s successfully ***EVADED*** %s's attack!", user.User.Name, boss.Name), 0
+	}
+	damageLog := ""
+	damage := float64(rand.Intn(int(boss.Stats.MaxDPS)-int(boss.Stats.MinDPS))) + boss.Stats.MinDPS
+	if bossSkill != nil {
+		damage = damage * bossSkill.SkillDamageModifier
+		damageLog += fmt.Sprintf(bossSkill.Quote+"\n", user.User.Name)
+		if bossSkill.CrowdControl != nil {
+			user.CrowdControlled = bossSkill.CrowdControl
+		}
+	}
+	damageLog += fmt.Sprintf("__**%s**__ hit __**%s**__ ", boss.Name, user.User.Name)
+	roundedDamage := ((int(damage) - int(user.StatModifier.Defense)) + int(math.Abs(damage-user.StatModifier.Defense))) / 2
+	criticalChance := randGenerator.Float64()
+	d.log.Debugf("%s Critical Chance: %v", boss.Name, criticalChance)
+	damageLog += fmt.Sprintf("for ")
+	if boss.Stats.CriticalRate != 0.0 && criticalChance <= boss.Stats.CriticalRate {
+		roundedDamage = int(float64(roundedDamage) * boss.Stats.CriticalDamageModifier)
+		damageLog += fmt.Sprintf("**%v** ***CRITICAL*** damage!", roundedDamage)
+	} else {
+		damageLog += fmt.Sprintf("**%v** damage!", roundedDamage)
+	}
+	return damageLog, roundedDamage
+}
+
+func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32, boss bool) (string, int) {
 
 	evasionChance := randGenerator.Float64()
 	d.log.Debugf("%s Evasion Chance: %v", defenderName, evasionChance)
@@ -38,7 +76,7 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 		return fmt.Sprintf("%s successfully ***EVADED*** %s's attack!", defenderName, attackerName), 0
 	}
 	theMonster := " "
-	if weapon != nil {
+	if !boss {
 		theMonster = " the "
 	}
 	damageLog := fmt.Sprintf("__**%s**__ hit%s__**%s**__ ", attackerName, theMonster, defenderName)
@@ -90,7 +128,7 @@ func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobCla
 				tier = 1
 			}
 			skill = weapon.Skills[tier]
-			damageMod = (float64(tier) / 10.0 * 2.0) + 1.0
+			damageMod = (float64(tier) / 10.0 * 2.0) + 1.0 + jobClass.Stats.SkillDamageModifier
 		}
 	}
 	return skill, damageMod

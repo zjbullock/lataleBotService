@@ -19,6 +19,15 @@ type Resolver struct {
 	Log loggo.Logger
 }
 
+func (r *Resolver) AddNewBoss(ctx context.Context, args struct{ Boss models.Monster }) (*string, error) {
+	id, err := r.Services.Manage.AddNewBoss(args.Boss)
+	if err != nil {
+		r.Log.Errorf("error adding new boss: %v", err)
+		return nil, err
+	}
+	return id, nil
+}
+
 func (r *Resolver) IncreaseLevelCap(ctx context.Context, args struct{ LevelCap int32 }) ([]*levelResolver, error) {
 	levelTable, err := r.Services.Manage.IncreaseLevelCap(int(args.LevelCap))
 	if err != nil {
@@ -278,6 +287,18 @@ func (r *Resolver) GetAdventure(ctx context.Context, args struct {
 	UserId string
 }) (*adventureResponseResolver, error) {
 	adventureLog, message, err := r.Services.Adventure.GetAdventure(args.AreaId, args.UserId)
+	if err != nil {
+		r.Log.Errorf("error getting adventure log: %v", err)
+		return nil, err
+	}
+	return &adventureResponseResolver{log: adventureLog, message: message}, nil
+}
+
+func (r *Resolver) GetBossFight(ctx context.Context, args struct {
+	BossId string
+	UserId string
+}) (*adventureResponseResolver, error) {
+	adventureLog, message, err := r.Services.Adventure.GetBossBattle(strings.Title(strings.ToLower(args.BossId)), args.UserId)
 	if err != nil {
 		r.Log.Errorf("error getting adventure log: %v", err)
 		return nil, err

@@ -7,4 +7,5 @@ type Query {
     GetArea(id: String!): AreaResponse
     GetAreaList: [AreaInfo!]
     GetJobList: [JobClassInfo]
+    GetBossFight(bossId: String!, userId: String!): AdventureResponse
 }

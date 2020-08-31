@@ -11,4 +11,5 @@ type StatModifier struct {
 	HP                     float64 `json:"hp" firestore:"hp"`
 	SkillProcRate          float64 `json:"skillProcRate" firestore:"skillProcRate"`
 	Recovery               float64 `json:"recovery" firestore:"recovery"`
+	SkillDamageModifier    float64 `json:"skillDamageModifier" firestore:"skillDamageModifier"`
 }
