@@ -1,0 +1,60 @@
+name: Deploy to QA
+on: 
+  push:
+    branches:
+      - dev
+jobs:      
+  deploy:
+    name: Deploy to QA
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.14
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+    - name: Get dependencies
+      run: |
+        go get -v -t -d ./...
+        if [ -f Gopkg.toml ]; then
+            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+            dep ensure
+        fi
+    - name: Build
+      run: go build -v .
+ 
+#     - name: Create Credentials File
+#       uses: finnp/create-file-action@1.0.0
+#       env:
+#         # file
+#         FILE_NAME: "credentials.json"
+#         # creds
+#         FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
+
+
+    - name: Create Config File
+      uses: finnp/create-file-action@1.0.0
+      env:
+        # file
+        FILE_NAME: "config.json"
+        # creds
+        FILE_DATA: ${{ secrets.APP_CONFIG_QA }}
+        
+    - name: Decode secrets.properties file
+      env:
+        SECRETS_PROPERTIES: ${{ secrets.FIREBASE_CREDENTIALS_QA }}
+      run: echo "$SECRETS_PROPERTIES" | base64 -d > ./credentials.json
+
+    # Optional subfolder directory to save the json file.
+    - name: Google Cloud Platform (GCP) CLI - gcloud
+      uses: actions-hub/gcloud@272.0.0
+      env:
+        # Project id
+        PROJECT_ID: ${{ secrets.GOOGLE_APPLICATION_PROJECT_ID_QA }}
+        # GCP authorization credentials
+        APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_QA }}
+      with: 
+          args: app deploy app-qa.yaml --quiet
