@@ -1,8 +1,31 @@
 input Monster {
     Name: String!
+    BossTitle: String
     Level: Int!
     Exp: Float!
     Ely: Int!
     Rank: Int!
     Stats: Stat!
+    BossBonus: BossBonus
+    Phases: [String!]
+    IdleTime: Float
+    IdlePhrase: String
+    Skills: [BossSkills!]
+}
+
+input BossBonus {
+    Name: String!
+    BossDropChance: Float
+    ID: Int!
+    CriticalRate: Float!
+    MaxDPS: Int!
+    MinDPS: Int!
+    CriticalDamageModifier: Float!
+    Defense: Int!
+    Accuracy: Float!
+    Evasion: Float!
+    HP: Int!
+    SkillProcRate: Float!
+    SkillDamageModifier: Float!
+    Recovery: Float!
 }

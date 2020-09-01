@@ -13,4 +13,5 @@ type Mutation {
     ClassChange(id: String!, class: String!, weapon: String): String
     ToggleExpEvent(expRate: Int!): String
     JobAdvance(id: String!, class: String!, weapon: String!): String
+    AddNewBoss(Boss: Monster!): String
 }

@@ -20,6 +20,7 @@ type Manage interface {
 	CreateExpTable(levels []models.Level) (*[]models.Level, error)
 	ToggleExpEvent(expRate int) error
 	AddNewEquipmentSheet(equipment models.EquipmentSheet) (*string, error)
+	AddNewBoss(boss models.Monster) (*string, error)
 }
 
 type manage struct {
@@ -29,10 +30,11 @@ type manage struct {
 	users     repositories.UserRepository
 	equipment repositories.EquipmentRepository
 	config    repositories.ConfigRepository
+	boss      repositories.BossRepository
 	log       loggo.Logger
 }
 
-func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, log loggo.Logger) Manage {
+func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, log loggo.Logger) Manage {
 	return &manage{
 		areas:     areas,
 		classes:   classes,
@@ -40,8 +42,18 @@ func NewManageService(areas repositories.AreasRepository, levels repositories.Le
 		users:     users,
 		equipment: equip,
 		config:    config,
+		boss:      boss,
 		log:       log,
 	}
+}
+
+func (m *manage) AddNewBoss(boss models.Monster) (*string, error) {
+	id, err := m.boss.InsertDocument(&boss.Name, boss)
+	if err != nil {
+		m.log.Errorf("error inserting document for boss: %v", err)
+		return nil, err
+	}
+	return id, nil
 }
 
 func (m *manage) ToggleExpEvent(expRate int) error {

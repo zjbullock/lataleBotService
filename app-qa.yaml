@@ -1,0 +1,4 @@
+# app.yaml
+#service: latale-bot
+runtime: go114
+env: standard

@@ -19,6 +19,15 @@ type Resolver struct {
 	Log loggo.Logger
 }
 
+func (r *Resolver) AddNewBoss(ctx context.Context, args struct{ Boss models.Monster }) (*string, error) {
+	id, err := r.Services.Manage.AddNewBoss(args.Boss)
+	if err != nil {
+		r.Log.Errorf("error adding new boss: %v", err)
+		return nil, err
+	}
+	return id, nil
+}
+
 func (r *Resolver) IncreaseLevelCap(ctx context.Context, args struct{ LevelCap int32 }) ([]*levelResolver, error) {
 	levelTable, err := r.Services.Manage.IncreaseLevelCap(int(args.LevelCap))
 	if err != nil {
@@ -213,6 +222,15 @@ func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*
 	return &userResponseResolver{user: user, message: message}, err
 }
 
+func (r *Resolver) GetBossList(ctx context.Context, args struct{ Id string }) (*[]string, error) {
+	bosses, err := r.Services.Adventure.GetBosses(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting bosses: %v", err)
+		return nil, err
+	}
+	return bosses, nil
+}
+
 func (r *Resolver) GetUserClassInfo(ctx context.Context, args struct{ Id string }) (*equipmentResolver, error) {
 	panic("Implement Me!")
 }
@@ -278,6 +296,18 @@ func (r *Resolver) GetAdventure(ctx context.Context, args struct {
 	UserId string
 }) (*adventureResponseResolver, error) {
 	adventureLog, message, err := r.Services.Adventure.GetAdventure(args.AreaId, args.UserId)
+	if err != nil {
+		r.Log.Errorf("error getting adventure log: %v", err)
+		return nil, err
+	}
+	return &adventureResponseResolver{log: adventureLog, message: message}, nil
+}
+
+func (r *Resolver) GetBossFight(ctx context.Context, args struct {
+	BossId string
+	UserId string
+}) (*adventureResponseResolver, error) {
+	adventureLog, message, err := r.Services.Adventure.GetBossBattle(strings.Title(strings.ToLower(args.BossId)), args.UserId)
 	if err != nil {
 		r.Log.Errorf("error getting adventure log: %v", err)
 		return nil, err
