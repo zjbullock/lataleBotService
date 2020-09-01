@@ -15,6 +15,7 @@ import (
 )
 
 type Adventure interface {
+	GetBosses(id string) (*[]string, error)
 	ClassChange(id, class string, weapon *string) (*string, error)
 	CreateParty(id string) (*string, error)
 	JoinParty(partyId, id string) (*string, error)
@@ -59,6 +60,40 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 		boss:      boss,
 		log:       log,
 	}
+}
+
+func (a *adventure) GetBosses(id string) (*[]string, error) {
+	var availableBosses []string
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not created an account yet."
+		availableBosses = append(availableBosses, message)
+		return &availableBosses, nil
+	}
+	bosses, err := a.boss.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "level",
+			Op:    "<=",
+			Value: user.ClassMap[user.CurrentClass].Level,
+		},
+	})
+	if err != nil {
+		a.log.Errorf("error getting bosses: %v", err)
+		message := "There was a problem getting the list of available bosses."
+		availableBosses = append(availableBosses, message)
+		return &availableBosses, nil
+	}
+	if bosses == nil {
+		message := "There are currently no bosses available to fight you."
+		availableBosses = append(availableBosses, message)
+		return &availableBosses, nil
+	}
+	availableBosses = append(availableBosses, fmt.Sprintf("Boss Name:	|	Boss Bonus:	|	Level: "))
+	for _, boss := range *bosses {
+		availableBosses = append(availableBosses, fmt.Sprintf("%s	|	%s	|	%v", boss.Name, boss.BossBonus.Name, boss.Level))
+	}
+	return &availableBosses, nil
 }
 
 func (a *adventure) CreateParty(id string) (*string, error) {
@@ -471,6 +506,7 @@ func (a *adventure) ClassAdvance(id, weapon, class string, givenClass *string) (
 						Exp:           user.ClassMap[classToUse].Exp,
 						CurrentWeapon: weapon,
 						Equipment:     a.determineStartingGear(classInfo.Tier, user.ClassMap[classToUse].Equipment),
+						BossBonuses:   user.ClassMap[classToUse].BossBonuses,
 					}
 					user.CurrentClass = classInfo.Name
 					_, err := a.users.UpdateDocument(user.ID, user)
@@ -826,7 +862,6 @@ func (a *adventure) GetUserInfo(id string) (*models.User, *string, error) {
 		}
 		user.PartyMembers = &partyMemberInfo
 	}
-
 	return user, nil, nil
 }
 
@@ -966,7 +1001,24 @@ func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, er
 	if err != nil {
 		a.log.Errorf("error generating party blob: %v", err)
 	}
-	adventureLog, err := a.bossBattleLog(partyMembers, boss, user.ID)
+	var adventureLog []string
+	coolDownLog := ""
+	for _, partyMember := range partyMembers {
+		logLine, coolDown := a.checkAdventureCooldown(partyMember.User, true)
+		if coolDown {
+			coolDownLog += *logLine + "\n"
+		}
+		if boss.Level > partyMember.UserLevel {
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s level is lower than the required level of: %v", partyMember.User.Name, boss.Level))
+		}
+	}
+	if len(coolDownLog) > 0 {
+		adventureLog = append(adventureLog, coolDownLog)
+	}
+	if len(adventureLog) != 0 {
+		return &adventureLog, nil, nil
+	}
+	adventureLog, err = a.bossBattleLog(partyMembers, boss, user.ID)
 	if err != nil {
 		a.log.Errorf("error while generating boss log: %v", err)
 		return nil, nil, err
@@ -1063,8 +1115,9 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 
 func (a *adventure) createPartyAdventureLog(user *models.User, area *models.Area) ([]string, error) {
 	var adventureLog []string
-	adventureLog, onCooldown := a.checkAdventureCooldown(user, adventureLog)
+	logLine, onCooldown := a.checkAdventureCooldown(user, false)
 	if onCooldown {
+		adventureLog = append(adventureLog, *logLine)
 		return adventureLog, nil
 	}
 	partyMemberInfos, err := a.generatePartyBlob(user)
@@ -1158,8 +1211,16 @@ func (a *adventure) generatePartyBlob(user *models.User) ([]*models.UserBlob, er
 	return partyMemberInfos, nil
 }
 
-func (a *adventure) checkAdventureCooldown(user *models.User, adventureLog []string) ([]string, bool) {
-	lastAction := user.LastActionTime.Add(120 * time.Second)
+func (a *adventure) checkAdventureCooldown(user *models.User, boss bool) (*string, bool) {
+	var lastAction time.Time
+	var commandType string
+	if boss {
+		lastAction = user.LastBossActionTime.Add(30 * time.Minute)
+		commandType = "boss"
+	} else {
+		lastAction = user.LastActionTime.Add(2 * time.Minute)
+		commandType = "adventure"
+	}
 	if !time.Now().After(lastAction) {
 		timeDifference := lastAction.Sub(time.Now())
 		a.log.Debugf("timeDifference: %v", timeDifference)
@@ -1174,10 +1235,10 @@ func (a *adventure) checkAdventureCooldown(user *models.User, adventureLog []str
 				seconds = int(timeDifference.Seconds()) - i
 			}
 		}
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ must wait **%v** ***Minutes*** and **%v** ***Seconds*** before using the adventure command again!", user.Name, minutes, seconds))
-		return adventureLog, true
+		coolDown := fmt.Sprintf("__**%s**__ must wait **%v** ***Minutes*** and **%v** ***Seconds*** before using the %s command again!", user.Name, minutes, seconds, commandType)
+		return &coolDown, true
 	}
-	return adventureLog, false
+	return nil, false
 }
 
 func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster, primaryUserId string) ([]string, error) {
@@ -1195,12 +1256,12 @@ func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster
 	}
 	activeSkills := 1
 	enraged := false
-	adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ has encountered **%s**.", boss.Name))
+	adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BOSS ENCOUNTER------------------------**\n__**The Party**__ has encountered **%s**, __**%s**__.\n**------------------------BOSS ENCOUNTER------------------------**", boss.Name, *boss.BossTitle))
 bossBattle:
 	for len(users) != 0 && bossCurrentHp != 0 {
 		for _, user := range users {
 			if user.CrowdControlled != nil && *user.CrowdControlled != 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ is currently dazed for **%v turn(s)**.", user.User.Name, *user.CrowdControlled))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.", user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled))
 			} else {
 				userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
 				bossCurrentHp = ((int(bossCurrentHp) - int(damage)) + int(math.Abs(float64(bossCurrentHp-damage)))) / 2
@@ -1216,9 +1277,10 @@ bossBattle:
 		}
 		phase, newActiveSkills := a.checkPhaseStatus(bossHPPercentage, boss, activeSkills)
 		if phase != "" && newActiveSkills != activeSkills {
-			adventureLog = append(adventureLog, phase)
 			activeSkills = newActiveSkills
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------PHASE %v------------------------**\n%s\n**------------------------PHASE %v------------------------**", activeSkills, phase, activeSkills))
 			if activeSkills == 4 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s has become enraged!**__", boss.Name))
 				enraged = true
 			}
 		}
@@ -1243,39 +1305,41 @@ bossBattle:
 			} else {
 				skill = nil
 			}
-			alivePlayers := users
+			var alivePlayers []*models.UserBlob
+			for _, user := range users {
+				alivePlayers = append(alivePlayers, user)
+			}
 			if skill != nil && skill.AoE {
-				a.log.Debugf("users: %v", users)
-
 				for i, user := range users {
-					a.log.Debugf("user: %v", user)
-					bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *user, boss, skill)
-					user.CurrentHP = ((user.CurrentHP - int(damage)) + int(math.Abs(float64(user.CurrentHP-damage)))) / 2
+					updatedUser, bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *user, boss, skill)
+					updatedUser.CurrentHP = ((updatedUser.CurrentHP - int(damage)) + int(math.Abs(float64(updatedUser.CurrentHP-damage)))) / 2
 					adventureLog = append(adventureLog, bossDamageLog)
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", user.User.Name, user.CurrentHP, user.MaxHP))
-					if user.CurrentHP <= 0 {
-						a.log.Debugf("alivePlayers: %v", alivePlayers)
-						copy(alivePlayers[i:], alivePlayers[i+1:]) // Shift a[i+1:] left one index.
-						alivePlayers[len(alivePlayers)-1] = nil    // Erase last element (write zero value).
-						alivePlayers = alivePlayers[:len(alivePlayers)-1]
-						a.log.Debugf("alivePlayers: %v", alivePlayers)
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", updatedUser.User.Name, updatedUser.CurrentHP, updatedUser.MaxHP))
+					alivePlayers[i] = updatedUser
+					if updatedUser.CurrentHP <= 0 {
+						adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", user.User.Name, boss.Name))
 					}
 				}
-				users = alivePlayers
-
+				users = []*models.UserBlob{}
+				for _, user := range alivePlayers {
+					if user.CurrentHP > 0 {
+						users = append(users, user)
+					}
+				}
 			} else {
 				targetedUser := randGenerator.Intn(len(users))
-				bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *users[targetedUser], boss, skill)
-				users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
+				updatedUser, bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *users[targetedUser], boss, skill)
+				updatedUser.CurrentHP = ((updatedUser.CurrentHP - int(damage)) + int(math.Abs(float64(updatedUser.CurrentHP-damage)))) / 2
 				adventureLog = append(adventureLog, bossDamageLog)
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP))
-				if users[targetedUser].CurrentHP <= 0 {
-					adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", users[targetedUser].User.Name, boss.Name))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", updatedUser.User.Name, updatedUser.CurrentHP, updatedUser.MaxHP))
+				if updatedUser.CurrentHP <= 0 {
+					adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", updatedUser.User.Name, boss.Name))
 					copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
 					users[len(users)-1] = nil                          // Erase last element (write zero value).
 					users = users[:len(users)-1]
+				} else {
+					users[targetedUser] = updatedUser
 				}
-				a.log.Debugf("users: %v", users)
 			}
 			if len(users) == 0 {
 				adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ was completely wiped out by __**%s**__ .", boss.Name))
@@ -1292,17 +1356,19 @@ bossBattle:
 		} else {
 			adventureLog = append(adventureLog, *boss.IdlePhrase)
 		}
-		a.log.Debugf("users: %v", users)
 		for i, user := range users {
 			if user.CrowdControlled != nil && *user.CrowdControlled > 0 {
 				crowdControlled := *user.CrowdControlled
 				crowdControlled--
 				user.CrowdControlled = &crowdControlled
+				if *user.CrowdControlled == 0 {
+					user.CrowdControlStatus = nil
+				}
 			}
-			userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
 			if user.CurrentHP != int(user.StatModifier.HP) && user.StatModifier.Recovery > 0.0 {
+				userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
 				if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
-					user.CurrentHP = int(user.CurrentHP)
+					user.CurrentHP = int(user.MaxHP)
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
 				} else {
@@ -1316,14 +1382,77 @@ bossBattle:
 		}
 	}
 	if battleWin {
+		adventureLog = append(adventureLog, "**---------------------------- PARTY WON THE BATTLE.  GETTING RESULTS. ----------------------------**")
+		levelCap, err := a.levels.ReadDocument("levelCap")
+		if err != nil {
+			a.log.Errorf("error retrieving current levelCap: %v", err)
+			return nil, err
+		}
+		expGainRate, err := a.GetExpGainRate("exp")
+		if err != nil {
+			return nil, err
+		}
+		for _, winningUsers := range users {
+			userInfo := winningUsers.User
+			if levelCap.Value > winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
+				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
+				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
+				bossExp := boss.Exp * int32(*expGainRate)
+				userClassInfo.Exp += bossExp
+				oldEly := *winningUsers.User.Ely
+				bossEly := boss.Ely * int32(*expGainRate)
+				oldEly += bossEly
+				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
+				userInfo.Ely = &oldEly
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", winningUsers.User.Name, utils.String(bossExp), bossEly))
+				newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, winningUsers.User, levelCap.Value)
+				if err != nil {
+					a.log.Errorf("error processing level ups: %v", err)
+					return adventureLog, nil
+				}
+				winningUsers.User.ClassMap[winningUsers.User.CurrentClass] = &newUserClassInfo
+				adventureLog = newAdventureLog
+			} else if battleWin && levelCap.Value == winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
+				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
+				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
+				bossExp := boss.Exp * int32(*expGainRate)
+				userClassInfo.Exp += bossExp
+				oldEly := *winningUsers.User.Ely
+				bossEly := boss.Ely * int32(*expGainRate)
+				oldEly += bossEly
+				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
+				userInfo.Ely = &oldEly
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", winningUsers.User.Name, utils.String(bossExp), bossEly))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
+			}
+			userInfo.LastBossActionTime = time.Now()
+
+			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			if err != nil {
+				a.log.Errorf("failed to update winningUsers doc with error: %v", err)
+				return adventureLog, nil
+			}
+		}
 
 	}
 	return adventureLog, nil
 }
 
+func (a *adventure) determineBossBonusDrop(userName string, userClassInfo models.ClassInfo, boss models.Monster, adventureLog []string) (models.ClassInfo, []string) {
+	dropChance := rand.Float64()
+	if userClassInfo.BossBonuses[boss.Name] == nil && dropChance > *boss.BossBonus.BossDropChance {
+		if userClassInfo.BossBonuses == nil {
+			userClassInfo.BossBonuses = make(map[string]*models.BossBonus)
+		}
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained the ability __**%s**__ for defeating __**%s**__ on their current class!", userName, boss.BossBonus.Name, boss.Name))
+		userClassInfo.BossBonuses[boss.Name] = boss.BossBonus
+	}
+	return userClassInfo, adventureLog
+}
+
 func (a *adventure) checkPhaseStatus(bossPercent float64, boss *models.Monster, phaseCount int) (string, int) {
 	phases := *boss.Phases
-	if bossPercent <= 0.10 && phaseCount < 4 {
+	if bossPercent <= 0.15 && phaseCount < 4 {
 		return phases[2], 4
 	}
 	if bossPercent <= 0.50 && phaseCount < 3 {
@@ -1405,7 +1534,7 @@ combat:
 			userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
 			if user.CurrentHP != int(user.StatModifier.HP) && user.StatModifier.Recovery > 0.0 {
 				if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
-					user.CurrentHP = int(user.CurrentHP)
+					user.CurrentHP = int(user.MaxHP)
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
 				} else {
@@ -1513,8 +1642,9 @@ func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonste
 
 func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) ([]string, error) {
 	var adventureLog []string
-	adventureLog, onCooldown := a.checkAdventureCooldown(user, adventureLog)
+	logLine, onCooldown := a.checkAdventureCooldown(user, false)
 	if onCooldown {
+		adventureLog = append(adventureLog, *logLine)
 		return adventureLog, nil
 	}
 	battleWin := false
@@ -1630,7 +1760,6 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 		a.log.Errorf("error getting level data: %v", err)
 		return userClassInfo, adventureLog, err
 	}
-	a.log.Debugf("userclassInfo: %v", userClassInfo)
 	if userClassInfo.Exp >= level.Exp {
 		userClassInfo.Exp -= level.Exp
 		userClassInfo.Level++
@@ -1696,17 +1825,44 @@ func (a *adventure) addNewEquipmentSheet(equipSheet map[string]*models.Equipment
 func (a *adventure) calculateBaseStat(user models.User, class models.StatModifier, equipmentMap map[string]*models.EquipmentSheet) models.StatModifier {
 	level := float64(user.ClassMap[user.CurrentClass].Level)
 	levelModifier := float64((level / 100) + 1)
+	bossMaxDps := 0.0
+	bossMinDps := 0.0
+	bossDefense := 0.0
+	bossHp := 0.0
+	bossRecv := 0.0
+	bossCritDmg := 0.0
+	bossCritRate := 0.0
+	bossSkillProc := 0.0
+	bossEvasion := 0.0
+	bossAccuracy := 0.0
+	bossSkillDmg := 0.0
+	a.log.Debugf("user bossbonuses: %v", user.ClassMap[user.CurrentClass].BossBonuses)
+	if user.ClassMap[user.CurrentClass].BossBonuses != nil && len(user.ClassMap[user.CurrentClass].BossBonuses) > 0 {
+		for _, bonus := range user.ClassMap[user.CurrentClass].BossBonuses {
+			bossMaxDps += bonus.MaxDPS
+			bossMinDps += bonus.MinDPS
+			bossDefense += bonus.Defense
+			bossHp += bonus.HP
+			bossRecv += bonus.Recovery
+			bossCritDmg += bonus.CriticalDamageModifier
+			bossCritRate += bonus.CriticalRate
+			bossSkillProc += bonus.SkillProcRate
+			bossEvasion += bonus.Evasion
+			bossAccuracy += bonus.Accuracy
+			bossSkillDmg += bonus.SkillDamageModifier
+		}
+	}
 	return models.StatModifier{
-		MaxDPS:                 getDynamicStat(20, levelModifier, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
-		MinDPS:                 getDynamicStat(20, levelModifier, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage,
-		Defense:                getDynamicStat(15, levelModifier, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense,
-		HP:                     getDynamicStat(100, levelModifier, class.HP) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].BindiHP,
-		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery),
-		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].GloveCriticalDamage + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].GlassesCritDamage,
-		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].EarringCritRate + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].RingCritRate,
-		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate),
-		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].StockingEvasion,
-		Accuracy:               getStaticStat(0.95, levelModifier, class.Accuracy) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Glove)].GloveAccuracy,
+		MaxDPS:                 getDynamicStat(20, levelModifier, class.MaxDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage + bossMaxDps,
+		MinDPS:                 getDynamicStat(20, levelModifier, class.MinDPS) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].WeaponDPS + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].MantleDamage + bossMinDps,
+		Defense:                getDynamicStat(15, levelModifier, class.Defense) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].ArmorDefense + bossDefense,
+		HP:                     getDynamicStat(100, levelModifier, class.HP) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].BindiHP + bossHp,
+		Recovery:               getStaticStat(0.05, levelModifier, class.Recovery) + bossRecv,
+		CriticalDamageModifier: getStaticStat(1.5, levelModifier, class.CriticalDamageModifier) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Body)].GloveCriticalDamage + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].GlassesCritDamage + bossCritDmg,
+		CriticalRate:           getStaticStat(0.05, levelModifier, class.CriticalRate) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].EarringCritRate + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].RingCritRate + bossCritRate,
+		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate) + bossSkillProc,
+		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Shoes)].ShoeEvasion + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Weapon)].StockingEvasion + bossEvasion,
+		Accuracy:               getStaticStat(0.95, levelModifier, class.Accuracy) + equipmentMap[strconv.Itoa(user.ClassMap[user.CurrentClass].Equipment.Glove)].GloveAccuracy + bossAccuracy,
 		SkillDamageModifier:    class.SkillDamageModifier,
 	}
 }

@@ -3,4 +3,5 @@ type UserClassInfo {
     Level: Int!
     Name: String!
     Equipment: EquipmentInfo!
+    BossBonuses: [String!]
 }

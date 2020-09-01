@@ -222,6 +222,15 @@ func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*
 	return &userResponseResolver{user: user, message: message}, err
 }
 
+func (r *Resolver) GetBossList(ctx context.Context, args struct{ Id string }) (*[]string, error) {
+	bosses, err := r.Services.Adventure.GetBosses(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting bosses: %v", err)
+		return nil, err
+	}
+	return bosses, nil
+}
+
 func (r *Resolver) GetUserClassInfo(ctx context.Context, args struct{ Id string }) (*equipmentResolver, error) {
 	panic("Implement Me!")
 }

@@ -24,3 +24,15 @@ func (c *classResolver) Exp(_ context.Context) int32 {
 func (c *classResolver) Equipment(_ context.Context) *equipmentResolver {
 	return &equipmentResolver{equipment: &c.classInfo.Equipment}
 }
+
+func (c *classResolver) BossBonuses(_ context.Context) *[]string {
+	var bossBonuses []string
+	if c.classInfo.BossBonuses != nil {
+		for _, bonus := range c.classInfo.BossBonuses {
+			bossBonuses = append(bossBonuses, bonus.Name)
+		}
+	} else {
+		return nil
+	}
+	return &bossBonuses
+}

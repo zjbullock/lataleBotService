@@ -15,6 +15,7 @@ type boss struct {
 type BossRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
 	ReadDocument(id string) (boss *models.Monster, err error)
+	QueryDocuments(args *[]models.QueryArg) (*[]models.Monster, error)
 }
 
 func NewBossRepository(log loggo.Logger, ds datasource.Datasource) BossRepository {
@@ -55,4 +56,24 @@ func (b *boss) ReadDocument(id string) (boss *models.Monster, err error) {
 		return nil, err
 	}
 	return boss, nil
+}
+
+func (b *boss) QueryDocuments(args *[]models.QueryArg) (*[]models.Monster, error) {
+	docs, err := b.ds.QueryCollection(globals.BOSSES, args)
+	if err != nil {
+		b.log.Errorf("error querying for documents with error: %v", err)
+		return nil, err
+	}
+	var bosses []models.Monster
+	for _, doc := range docs {
+		boss := models.Monster{}
+		err := doc.DataTo(&boss)
+		if err != nil {
+			b.log.Errorf("error converting doc to area with error: %v", err)
+			return nil, err
+		}
+		bosses = append(bosses, boss)
+	}
+
+	return &bosses, nil
 }
