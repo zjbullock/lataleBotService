@@ -1440,7 +1440,7 @@ bossBattle:
 
 func (a *adventure) determineBossBonusDrop(userName string, userClassInfo models.ClassInfo, boss models.Monster, adventureLog []string) (models.ClassInfo, []string) {
 	dropChance := rand.Float64()
-	if userClassInfo.BossBonuses[boss.Name] == nil && dropChance > *boss.BossBonus.BossDropChance {
+	if userClassInfo.BossBonuses[boss.Name] == nil && dropChance <= *boss.BossBonus.BossDropChance {
 		if userClassInfo.BossBonuses == nil {
 			userClassInfo.BossBonuses = make(map[string]*models.BossBonus)
 		}
