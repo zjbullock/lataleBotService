@@ -77,7 +77,7 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 		return fmt.Sprintf("__**%s**__ successfully ***EVADED*** __**%s**__'s attack!", defenderName, attackerName), 0
 	}
 	theMonster := " "
-	if !boss {
+	if !boss && weapon == nil {
 		theMonster = " the "
 	}
 	damageLog := fmt.Sprintf("__**%s**__ hit%s__**%s**__ ", attackerName, theMonster, defenderName)
