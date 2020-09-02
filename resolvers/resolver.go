@@ -222,6 +222,32 @@ func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*
 	return &userResponseResolver{user: user, message: message}, err
 }
 
+func (r *Resolver) GetBossBonus(ctx context.Context, args struct{ Id string }) (*statResolver, error) {
+	bossId, err := strconv.ParseInt(args.Id, 10, 32)
+	if err != nil {
+		r.Log.Errorf("error parsing input string into int:%v", err)
+		return nil, err
+	}
+	bonus, err := r.Services.Adventure.GetBossBonus(int32(bossId))
+	if err != nil {
+		r.Log.Errorf("error retrieving boss bonus: %v", err)
+		return nil, err
+	}
+	return &statResolver{stat: &models.StatModifier{
+		CriticalRate:           bonus.CriticalRate,
+		MaxDPS:                 bonus.MaxDPS,
+		MinDPS:                 bonus.MinDPS,
+		CriticalDamageModifier: bonus.CriticalDamageModifier,
+		Defense:                bonus.Defense,
+		Accuracy:               bonus.Accuracy,
+		Evasion:                bonus.Evasion,
+		HP:                     bonus.HP,
+		SkillProcRate:          bonus.SkillProcRate,
+		Recovery:               bonus.Recovery,
+		SkillDamageModifier:    bonus.SkillDamageModifier,
+	}}, nil
+}
+
 func (r *Resolver) GetBossList(ctx context.Context, args struct{ Id string }) (*[]string, error) {
 	bosses, err := r.Services.Adventure.GetBosses(args.Id)
 	if err != nil {
