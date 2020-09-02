@@ -1259,32 +1259,37 @@ func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster
 	adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BOSS ENCOUNTER------------------------**\n__**The Party**__ has encountered **%s**, __**%s**__.\n**------------------------BOSS ENCOUNTER------------------------**", boss.Name, *boss.BossTitle))
 bossBattle:
 	for len(users) != 0 && bossCurrentHp != 0 {
+		userLogs := ""
 		for _, user := range users {
 			if user.CrowdControlled != nil && *user.CrowdControlled != 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.", user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled))
+				userLogs += fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.\n", user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
 			} else {
 				userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
 				bossCurrentHp = ((int(bossCurrentHp) - int(damage)) + int(math.Abs(float64(bossCurrentHp-damage)))) / 2
-				adventureLog = append(adventureLog, userLog)
+				userLogs += userLog + "\n"
 				bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100)))
+				userLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
 			}
 			if bossCurrentHp <= 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!", boss.Name))
+				userLogs += fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!\n", boss.Name)
+				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s\n**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
 				battleWin = true
 				break bossBattle
 			}
 		}
+		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s\n**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
 		phase, newActiveSkills := a.checkPhaseStatus(bossHPPercentage, boss, activeSkills)
 		if phase != "" && newActiveSkills != activeSkills {
 			activeSkills = newActiveSkills
-			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------PHASE %v------------------------**\n%s\n**------------------------PHASE %v------------------------**", activeSkills, phase, activeSkills))
+			enragedText := ""
 			if activeSkills == 4 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s has become enraged!**__", boss.Name))
+				enragedText += fmt.Sprintf("__**%s has become enraged!**__\n", boss.Name)
 				enraged = true
 			}
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------PHASE %v------------------------**\n%s\n%s**------------------------PHASE %v------------------------**", activeSkills, phase, enragedText, activeSkills))
 		}
 		active := randGenerator.Float64()
+		bossLogs := ""
 		if active > *boss.IdleTime || enraged {
 			skills := *boss.Skills
 			var availableSkills []*models.BossSkill
@@ -1313,11 +1318,11 @@ bossBattle:
 				for i, user := range users {
 					updatedUser, bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *user, boss, skill)
 					updatedUser.CurrentHP = ((updatedUser.CurrentHP - int(damage)) + int(math.Abs(float64(updatedUser.CurrentHP-damage)))) / 2
-					adventureLog = append(adventureLog, bossDamageLog)
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", updatedUser.User.Name, updatedUser.CurrentHP, updatedUser.MaxHP))
+					bossLogs += bossDamageLog + "\n"
+					bossLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", updatedUser.User.Name, updatedUser.CurrentHP, updatedUser.MaxHP)
 					alivePlayers[i] = updatedUser
 					if updatedUser.CurrentHP <= 0 {
-						adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", user.User.Name, boss.Name))
+						bossLogs += fmt.Sprintf("**%s was killed by %s!**\n", user.User.Name, boss.Name)
 					}
 				}
 				users = []*models.UserBlob{}
@@ -1330,10 +1335,10 @@ bossBattle:
 				targetedUser := randGenerator.Intn(len(users))
 				updatedUser, bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *users[targetedUser], boss, skill)
 				updatedUser.CurrentHP = ((updatedUser.CurrentHP - int(damage)) + int(math.Abs(float64(updatedUser.CurrentHP-damage)))) / 2
-				adventureLog = append(adventureLog, bossDamageLog)
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", updatedUser.User.Name, updatedUser.CurrentHP, updatedUser.MaxHP))
+				bossLogs += bossDamageLog + "\n"
+				bossLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", updatedUser.User.Name, updatedUser.CurrentHP, updatedUser.MaxHP)
 				if updatedUser.CurrentHP <= 0 {
-					adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", updatedUser.User.Name, boss.Name))
+					bossLogs += fmt.Sprintf("**%s was killed by %s!**\n", updatedUser.User.Name, boss.Name)
 					copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
 					users[len(users)-1] = nil                          // Erase last element (write zero value).
 					users = users[:len(users)-1]
@@ -1341,8 +1346,10 @@ bossBattle:
 					users[targetedUser] = updatedUser
 				}
 			}
+
 			if len(users) == 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ was completely wiped out by __**%s**__ .", boss.Name))
+				bossLogs += fmt.Sprintf("__**The Party**__ was completely wiped out by __**%s**__ .\n", boss.Name)
+				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS ATTACK TURN------------------------**\n%s\n**------------------------END BOSS ATTACK TURN------------------------**", bossLogs))
 				break bossBattle
 			}
 			for _, skill := range skills {
@@ -1354,8 +1361,10 @@ bossBattle:
 			}
 			boss.Skills = &skills
 		} else {
-			adventureLog = append(adventureLog, *boss.IdlePhrase)
+			bossLogs += *boss.IdlePhrase + "\n"
 		}
+		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS ATTACK TURN------------------------**\n%s\n**------------------------END BOSS ATTACK TURN------------------------**", bossLogs))
+		healLogs := ""
 		for i, user := range users {
 			if user.CrowdControlled != nil && *user.CrowdControlled > 0 {
 				crowdControlled := *user.CrowdControlled
@@ -1369,16 +1378,18 @@ bossBattle:
 				userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
 				if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
 					user.CurrentHP = int(user.MaxHP)
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+					healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, userHeal)
+					healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, user.CurrentHP, user.MaxHP)
 				} else {
 					user.CurrentHP += userHeal
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+					healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, userHeal)
+					healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, user.CurrentHP, user.MaxHP)
 				}
 			}
 			users[i].CurrentHP = user.CurrentHP
-
+		}
+		if healLogs != "" {
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY HEAL TURN------------------------**\n%s\n**------------------------END PARTY HEAL TURN------------------------**", healLogs))
 		}
 	}
 	if battleWin {
@@ -1434,6 +1445,8 @@ bossBattle:
 			}
 		}
 
+	} else {
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- THE PARTY LOST THE BATTLE AGAINST __**%s**__.----------------------------**", boss.Name))
 	}
 	return adventureLog, nil
 }
@@ -1493,59 +1506,70 @@ combat:
 		//Party will target enemies in order of how they spawn.
 		//Enemies will attack party members randomly.
 		//Battle continues until one side is no longer able to fight.
+		userLogs := ""
 		for _, user := range users {
 			userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, encounteredMonsters[0].Name, *user.StatModifier, *encounteredMonsters[0].StatModifier, &user.Weapon, user.JobClass, &user.UserLevel, false)
 			currentMonsterHP := int(encounteredMonsters[0].CurrentHP)
 			currentMonsterHP = ((int(currentMonsterHP) - int(damage)) + int(math.Abs(float64(currentMonsterHP-damage)))) / 2
-			adventureLog = append(adventureLog, userLog)
+			userLogs += userLog + "\n"
 			monsterMaxHp := int(encounteredMonsters[0].StatModifier.HP)
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", encounteredMonsters[0].Name, currentMonsterHP, monsterMaxHp))
+			userLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", encounteredMonsters[0].Name, currentMonsterHP, monsterMaxHp)
 			encounteredMonsters[0].CurrentHP = int32(currentMonsterHP)
 			if encounteredMonsters[0].CurrentHP <= 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!", user.User.Name, encounteredMonsters[0].Name))
+				userLogs += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", user.User.Name, encounteredMonsters[0].Name)
 				copy(encounteredMonsters[0:], encounteredMonsters[0+1:]) // Shift a[i+1:] left one index.
 				encounteredMonsters[len(encounteredMonsters)-1] = nil    // Erase last element (write zero value).
 				encounteredMonsters = encounteredMonsters[:len(encounteredMonsters)-1]
 			}
 			if len(encounteredMonsters) == 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s\n**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
 				battleWin = true
 				break combat
 			}
 		}
+		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s\n**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
+		enemiesLog := ""
 		for _, monster := range encounteredMonsters {
 			a.log.Debugf("users: %v", users)
 			targetedUser := randGenerator.Intn(len(users))
 			monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, users[targetedUser].User.Name, *monster.StatModifier, *users[targetedUser].StatModifier, nil, nil, nil, false)
 			users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
-			adventureLog = append(adventureLog, monsterLog)
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP))
+			enemiesLog += monsterLog + "\n"
+			enemiesLog += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP)
 			if users[targetedUser].CurrentHP <= 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", users[targetedUser].User.Name, monster.Name))
+				enemiesLog += fmt.Sprintf("**%s was killed by %s!**\n", users[targetedUser].User.Name, monster.Name)
 				copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
 				users[len(users)-1] = nil                          // Erase last element (write zero value).
 				users = users[:len(users)-1]
 			}
 			a.log.Debugf("users: %v", users)
 			if len(users) == 0 {
+				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN ENEMIES ATTACK TURN------------------------**\n%s\n**------------------------END ENEMIES ATTACK TURN------------------------**", enemiesLog))
 				break combat
 			}
 		}
+		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN ENEMIES ATTACK TURN------------------------**\n%s\n**------------------------END ENEMIES ATTACK TURN------------------------**", enemiesLog))
+		healLogs := ""
 		for i, user := range users {
 			userHeal := int(user.StatModifier.HP * user.StatModifier.Recovery)
 			if user.CurrentHP != int(user.StatModifier.HP) && user.StatModifier.Recovery > 0.0 {
 				if userHeal+user.CurrentHP > int(user.StatModifier.HP) {
 					user.CurrentHP = int(user.MaxHP)
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+					healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, userHeal)
+					healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, user.CurrentHP, user.MaxHP)
 				} else {
 					user.CurrentHP += userHeal
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.User.Name, userHeal))
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.User.Name, user.CurrentHP, user.MaxHP))
+					healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, userHeal)
+					healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, user.CurrentHP, user.MaxHP)
 				}
 			}
 			users[i].CurrentHP = user.CurrentHP
 
 		}
+		if healLogs != "" {
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY HEAL TURN------------------------**\n%s\n**------------------------END PARTY HEAL TURN------------------------**", healLogs))
+		}
+		enemyHealLogs := ""
 		for i, monster := range encounteredMonsters {
 			if monster.StatModifier.Recovery > 0.0 {
 				monsterHeal := int32(monster.StatModifier.HP * monster.StatModifier.Recovery)
@@ -1555,15 +1579,18 @@ combat:
 					monster.CurrentHP += monsterHeal
 				}
 				encounteredMonsters[i].CurrentHP = monster.CurrentHP
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **HEALED** for %v HP.", monster.Name, monsterHeal))
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", monster.Name, monsterHeal+monster.CurrentHP, strconv.FormatFloat(monster.StatModifier.HP, 'f', -1, 64)))
+				enemyHealLogs += fmt.Sprintf("__**%s**__ **HEALED** for %v HP.\n", monster.Name, monsterHeal)
+				enemyHealLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", monster.Name, monsterHeal+monster.CurrentHP, strconv.FormatFloat(monster.StatModifier.HP, 'f', -1, 64))
 			}
+		}
+		if enemyHealLogs != "" {
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN ENEMIES HEAL TURN------------------------**\n%s\n**------------------------END ENEMIES HEAL TURN------------------------**", enemyHealLogs))
 
 		}
 	}
 
 	if battleWin {
-		adventureLog = append(adventureLog, "**---------------------------- PARTY WON THE BATTLE.  GETTING RESULTS. ----------------------------**")
+		adventureLog = append(adventureLog, "**---------------------------- THE PARTY WON THE BATTLE.  GETTING RESULTS. ----------------------------**")
 		levelCap, err := a.levels.ReadDocument("levelCap")
 		if err != nil {
 			a.log.Errorf("error retrieving current levelCap: %v", err)
@@ -1613,6 +1640,8 @@ combat:
 			}
 		}
 
+	} else {
+		adventureLog = append(adventureLog, "**---------------------------- THE PARTY LOST THE BATTLE. ----------------------------**")
 	}
 	a.log.Debugf("encounteredMonsters: %v", encounteredMonsters)
 	return adventureLog, nil
@@ -1664,43 +1693,51 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	for currentHP != 0 && monsterHP != 0 {
 		userLog, damage := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, userStats, monster.Stats, &userWeapon, &classInfo, &userLevel, false)
 		monsterHP = ((int(monsterHP) - int(damage)) + int(math.Abs(float64(monsterHP-damage)))) / 2
-		adventureLog = append(adventureLog, userLog)
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", monster.Name, monsterHP, monsterMaxHp))
+		userLog += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", monster.Name, monsterHP, monsterMaxHp)
 		if monsterHP <= 0 {
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!", user.Name, monster.Name))
+			userLog += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", user.Name, monster.Name)
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN %s's ATTACK TURN------------------------**\n%s\n**------------------------END %s's ATTACK TURN------------------------**", user.Name, userLog, user.Name))
 			battleWin = true
 			break
 		}
+		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN %s's ATTACK TURN------------------------**\n%s\n**------------------------END %s's ATTACK TURN------------------------**", user.Name, userLog, user.Name))
+
 		monsterLog, damage := a.damage.DetermineHit(randGenerator, monster.Name, user.Name, monster.Stats, userStats, nil, nil, nil, false)
 		currentHP = ((int(currentHP) - int(damage)) + int(math.Abs(float64(currentHP-damage)))) / 2
-		adventureLog = append(adventureLog, monsterLog)
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v", user.Name, currentHP, userMaxHP))
+		monsterLog += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", user.Name, currentHP, userMaxHP)
 		if currentHP <= 0 {
-			adventureLog = append(adventureLog, fmt.Sprintf("**%s was killed by %s!**", user.Name, monster.Name))
+			monsterLog += fmt.Sprintf("**%s was killed by %s!**\n", user.Name, monster.Name)
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN %s's ATTACK TURN------------------------**\n%s\n**------------------------END %s's ATTACK TURN------------------------**", monster.Name, monsterLog, monster.Name))
 			break
 		}
+		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN %s's ATTACK TURN------------------------**\n%s\n**------------------------END %s's ATTACK TURN------------------------**", monster.Name, monsterLog, monster.Name))
+
 		userHeal := int(userStats.HP * userStats.Recovery)
 		if userStats.Recovery > 0.0 && currentHP != int(userStats.HP) {
+			healLogs := ""
 			if userHeal+currentHP > int(userStats.HP) {
 				currentHP = int(userStats.HP)
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
+				healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.Name, userHeal)
+				healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.Name, currentHP, userMaxHP)
 			} else {
 				currentHP += userHeal
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.", user.Name, userHeal))
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", user.Name, currentHP, userMaxHP))
+				healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.Name, userHeal)
+				healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.Name, currentHP, userMaxHP)
 			}
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN %s's HEAL TURN------------------------**\n%s\n**------------------------END %s's HEAL TURN------------------------**", user.Name, healLogs, user.Name))
 		}
 
 		if monster.Stats.Recovery > 0.0 {
+			healLogs := ""
 			monsterHeal := int(monster.Stats.HP * monster.Stats.Recovery)
 			if monsterHeal+monsterHP > int(monster.Stats.HP) {
 				monsterHP = int(monster.Stats.HP)
 			} else {
 				monsterHP += monsterHeal
 			}
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **HEALED** for %v HP.", monster.Name, monsterHeal))
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s HP: %v/%v!", monster.Name, monsterHP, monsterMaxHp))
+			healLogs += fmt.Sprintf("__**%s**__ **HEALED** for %v HP.\n", monster.Name, monsterHeal)
+			healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", monster.Name, monsterHP, monsterMaxHp)
+			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN %s's HEAL TURN------------------------**\n%s\n**------------------------END %s's HEAL TURN------------------------**", monster.Name, healLogs, monster.Name))
 		}
 
 	}
@@ -1744,6 +1781,8 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		user.ClassMap[user.CurrentClass] = &userClassInfo
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
+	} else {
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", user.Name))
 	}
 	user.LastActionTime = time.Now()
 	_, err = a.users.UpdateDocument(user.ID, user)
