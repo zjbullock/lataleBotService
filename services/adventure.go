@@ -16,6 +16,7 @@ import (
 
 type Adventure interface {
 	GetBosses(id string) (*[]string, error)
+	GetBossBonus(id int32) (*models.BossBonus, error)
 	ClassChange(id, class string, weapon *string) (*string, error)
 	CreateParty(id string) (*string, error)
 	JoinParty(partyId, id string) (*string, error)
@@ -60,6 +61,25 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 		boss:      boss,
 		log:       log,
 	}
+}
+
+func (a *adventure) GetBossBonus(id int32) (*models.BossBonus, error) {
+	bosses, err := a.boss.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "bossBonus.id",
+			Op:    "==",
+			Value: id,
+		},
+	})
+	if err != nil {
+		a.log.Errorf("error retrieving boss bonus with id %v: %v", id, err)
+		return nil, err
+	}
+	var bossBonus *models.BossBonus
+	for _, boss := range *bosses {
+		bossBonus = boss.BossBonus
+	}
+	return bossBonus, nil
 }
 
 func (a *adventure) GetBosses(id string) (*[]string, error) {
@@ -1446,7 +1466,7 @@ bossBattle:
 		}
 
 	} else {
-		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- THE PARTY LOST THE BATTLE AGAINST __**%s**__.----------------------------**", boss.Name))
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- THE PARTY LOST THE BATTLE AGAINST** __**%s**__.**----------------------------**", boss.Name))
 	}
 	return adventureLog, nil
 }
