@@ -1241,7 +1241,7 @@ func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, er
 	boss, err := a.boss.ReadDocument(bossId)
 	if err != nil {
 		a.log.Errorf("error getting area info: %v", err)
-		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
+		message := "Could not find a boss with that name.  Please be sure to use the names specified in **-bosses**."
 		return nil, &message, nil
 	}
 	partyMembers, err := a.generatePartyBlob(user)
