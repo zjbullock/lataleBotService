@@ -551,7 +551,7 @@ func (a *adventure) ClassAdvance(id, weapon, class string, givenClass *string) (
 
 func (a *adventure) jobTierMessages(tier int32) string {
 	if tier == 2 {
-		message := fmt.Sprintf("Upon reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earring, Ring, Cloak, and Stockings**.\n")
+		message := fmt.Sprintf("Upon reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earrings, Ring, Cloak, and Stockings**.\n")
 		message += fmt.Sprintf("Your weapon has also been upgraded, and more upgrades have become accessible as a result.  Your continued patronage is appreciated.\n")
 		return message
 	}
@@ -609,6 +609,12 @@ func (a *adventure) UpdateEquipmentPiece(id, equipment string) (*string, error) 
 	if equipment == "gloves" {
 		equipment = "glove"
 	}
+	if equipment == "earring" {
+		equipment = "earrings"
+	}
+	if equipment == "cloak" {
+		equipment = "mantle"
+	}
 	//1.  Get User Info
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
@@ -627,6 +633,12 @@ func (a *adventure) UpdateEquipmentPiece(id, equipment string) (*string, error) 
 func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error) {
 	if equipment == "gloves" {
 		equipment = "glove"
+	}
+	if equipment == "earring" {
+		equipment = "earrings"
+	}
+	if equipment == "cloak" {
+		equipment = "mantle"
 	}
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
@@ -678,7 +690,7 @@ func (a *adventure) GetEquipmentPieceCost(id, equipment string) (*string, error)
 		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
 		message += fmt.Sprintf("Critical Damage gained from glasses: **%s%%** -> **%s%%**\n", oldGlasses, glasses)
 		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
-	case "earrings":
+	case "earrings", "earring":
 		oldEarrings := strconv.FormatFloat(oldEquipSheet.EarringCritRate*100.0, 'f', -1, 64)
 		earrings := strconv.FormatFloat(equipSheet.EarringCritRate*100.0, 'f', -1, 64)
 		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
