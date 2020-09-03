@@ -1000,52 +1000,6 @@ func (a *adventure) GetJobList() (*[]models.JobClass, error) {
 	return jobs, err
 }
 
-func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, error) {
-	user, err := a.users.ReadDocument(userId)
-	if err != nil {
-		a.log.Errorf("error getting user info: %v", err)
-		message := "User has not yet selected a class, or created an account"
-		return nil, &message, nil
-	}
-	if user.Party == nil {
-		message := "You must be in a party to participate in Boss Fights!  Join a party, or create one using `!latale -createParty`."
-		return nil, &message, nil
-	}
-	boss, err := a.boss.ReadDocument(bossId)
-	if err != nil {
-		a.log.Errorf("error getting area info: %v", err)
-		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
-		return nil, &message, nil
-	}
-	partyMembers, err := a.generatePartyBlob(user)
-	if err != nil {
-		a.log.Errorf("error generating party blob: %v", err)
-	}
-	var adventureLog []string
-	coolDownLog := ""
-	for _, partyMember := range partyMembers {
-		logLine, coolDown := a.checkAdventureCooldown(partyMember.User, true)
-		if coolDown {
-			coolDownLog += *logLine + "\n"
-		}
-		if boss.Level > partyMember.UserLevel {
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s level is lower than the required level of: %v", partyMember.User.Name, boss.Level))
-		}
-	}
-	if len(coolDownLog) > 0 {
-		adventureLog = append(adventureLog, coolDownLog)
-	}
-	if len(adventureLog) != 0 {
-		return &adventureLog, nil, nil
-	}
-	adventureLog, err = a.bossBattleLog(partyMembers, boss, user.ID)
-	if err != nil {
-		a.log.Errorf("error while generating boss log: %v", err)
-		return nil, nil, err
-	}
-	return &adventureLog, nil, nil
-}
-
 func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, error) {
 	/*
 		1.  Pull User Current stats
@@ -1261,12 +1215,62 @@ func (a *adventure) checkAdventureCooldown(user *models.User, boss bool) (*strin
 	return nil, false
 }
 
+func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, error) {
+	user, err := a.users.ReadDocument(userId)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not yet selected a class, or created an account"
+		return nil, &message, nil
+	}
+	if user.Party == nil {
+		message := "You must be in a party to participate in Boss Fights!  Join a party, or create one using `!latale -createParty`."
+		return nil, &message, nil
+	}
+	boss, err := a.boss.ReadDocument(bossId)
+	if err != nil {
+		a.log.Errorf("error getting area info: %v", err)
+		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
+		return nil, &message, nil
+	}
+	partyMembers, err := a.generatePartyBlob(user)
+	if err != nil {
+		a.log.Errorf("error generating party blob: %v", err)
+	}
+	var adventureLog []string
+	coolDownLog := ""
+	for _, partyMember := range partyMembers {
+		logLine, coolDown := a.checkAdventureCooldown(partyMember.User, true)
+		if coolDown {
+			coolDownLog += *logLine + "\n"
+		}
+		if boss.Level > partyMember.UserLevel {
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s level is lower than the required level of: %v", partyMember.User.Name, boss.Level))
+		}
+	}
+	if len(coolDownLog) > 0 {
+		adventureLog = append(adventureLog, coolDownLog)
+	}
+	if len(adventureLog) != 0 {
+		return &adventureLog, nil, nil
+	}
+	adventureLog, err = a.bossBattleLog(partyMembers, boss, user.ID)
+	if err != nil {
+		a.log.Errorf("error while generating boss log: %v", err)
+		return nil, nil, err
+	}
+	return &adventureLog, nil, nil
+}
+
 func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster, primaryUserId string) ([]string, error) {
 	battleWin := false
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGenerator := rand.New(randSource)
 	bossMaxHp := int(boss.Stats.HP) * len(users)
 	bossCurrentHp := bossMaxHp
+	partyBonus := 1.0
+	if len(users) > 1 {
+		partyBonus = (float64(len(users)) / 10.0) + 1.0
+	}
 	bossHPPercentage := float64(bossCurrentHp) / float64(bossMaxHp)
 	var adventureLog []string
 	//Set cooldowns of all boss skills to 0 for beginning.
@@ -1281,7 +1285,7 @@ bossBattle:
 	for len(users) != 0 && bossCurrentHp != 0 {
 		userLogs := ""
 		for _, user := range users {
-			if user.CrowdControlled != nil && *user.CrowdControlled != 0 {
+			if user.CrowdControlled != nil && *user.CrowdControlled != 0 && *user.CrowdControlStatus != "poisoned" {
 				userLogs += fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.\n", user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
 			} else {
 				userLog, damage := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
@@ -1383,7 +1387,33 @@ bossBattle:
 		} else {
 			bossLogs += *boss.IdlePhrase + "\n"
 		}
+		var alivePlayers []*models.UserBlob
+		for _, user := range users {
+			alivePlayers = append(alivePlayers, user)
+		}
+		playerDied := false
+		for i, user := range users {
+			if user.CurrentHP > 0 && user.CrowdControlled != nil && *user.CrowdControlled != 0 && *user.CrowdControlStatus == "poisoned" {
+				poisonDamage := int(float64(user.MaxHP) * 0.05)
+				user.CurrentHP = ((user.CurrentHP - int(poisonDamage)) + int(math.Abs(float64(user.CurrentHP-poisonDamage)))) / 2
+				bossLogs += fmt.Sprintf("**%s lost %v HP!** due to being **%s**. %s is **%s** for **%v turn(s)**.\n", user.User.Name, poisonDamage, *user.CrowdControlStatus, user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
+				bossLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", user.User.Name, user.CurrentHP, user.MaxHP)
+				alivePlayers[i] = user
+				if user.CurrentHP <= 0 {
+					bossLogs += fmt.Sprintf("**%s was killed by %s!**\n", user.User.Name, boss.Name)
+					playerDied = true
+				}
+			}
+		}
+		if playerDied {
+			for _, user := range alivePlayers {
+				if user.CurrentHP > 0 {
+					users = append(users, user)
+				}
+			}
+		}
 		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS ATTACK TURN------------------------**\n%s**------------------------END BOSS ATTACK TURN------------------------**", bossLogs))
+
 		healLogs := ""
 		for i, user := range users {
 			if user.CrowdControlled != nil && *user.CrowdControlled > 0 {
@@ -1428,10 +1458,10 @@ bossBattle:
 			if levelCap.Value > winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
 				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
-				bossExp := boss.Exp * int32(*expGainRate)
+				bossExp := int32(float64(boss.Exp*int32(*expGainRate)) * partyBonus)
 				userClassInfo.Exp += bossExp
 				oldEly := *winningUsers.User.Ely
-				bossEly := boss.Ely * int32(*expGainRate)
+				bossEly := int32(float64(boss.Ely*int32(*expGainRate)) * partyBonus)
 				oldEly += bossEly
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly
@@ -1446,10 +1476,10 @@ bossBattle:
 			} else if battleWin && levelCap.Value == winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
 				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
-				bossExp := boss.Exp * int32(*expGainRate)
+				bossExp := int32(float64(boss.Exp*int32(*expGainRate)) * partyBonus)
 				userClassInfo.Exp += bossExp
 				oldEly := *winningUsers.User.Ely
-				bossEly := boss.Ely * int32(*expGainRate)
+				bossEly := int32(float64(boss.Ely*int32(*expGainRate)) * partyBonus)
 				oldEly += bossEly
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly

@@ -43,7 +43,7 @@ func (d *damage) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 	if bossSkill != nil {
 		damage = damage * bossSkill.SkillDamageModifier
 		damageLog += fmt.Sprintf(bossSkill.Quote+" with the skill ***%s*** ", user.User.Name, bossSkill.Name)
-		if bossSkill.CrowdControl != nil {
+		if bossSkill.CrowdControl != nil && (updatedUser.CrowdControlled == nil || *updatedUser.CrowdControlled == 0) {
 			updatedUser.CrowdControlled = bossSkill.CrowdControl
 			updatedUser.CrowdControlStatus = bossSkill.CrowdControlStatus
 		}
