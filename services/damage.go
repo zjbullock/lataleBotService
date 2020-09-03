@@ -127,7 +127,7 @@ func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobCla
 				tier = 1
 			}
 			skill = weapon.Skills[tier]
-			damageMod = (float64(tier) / 10.0 * 2.0) + 1.0 + jobClass.Stats.SkillDamageModifier
+			damageMod = ((float64(tier) / 10.0 * 2.0) + 1.0) * jobClass.Stats.SkillDamageModifier
 		}
 	}
 	return skill, damageMod
