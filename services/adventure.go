@@ -16,6 +16,7 @@ import (
 
 type Adventure interface {
 	GetBosses(id string) (*[]string, error)
+	KickParty(leaderId, kickId string) (*string, error)
 	GetBossBonus(id int32) (*models.BossBonus, error)
 	ClassChange(id, class string, weapon *string) (*string, error)
 	CreateParty(id string) (*string, error)
@@ -244,6 +245,61 @@ func (a *adventure) JoinParty(partyId, id string) (*string, error) {
 		return &message, nil
 	}
 	message := fmt.Sprintf("You have successfully been added to the party!  To leave the party in the future, simply run the command **!latale -leaveParty**")
+	return &message, nil
+}
+
+func (a *adventure) KickParty(leaderId, kickId string) (*string, error) {
+	_, err := a.users.ReadDocument(leaderId)
+	if err != nil {
+		a.log.Errorf("error retrieving userInfo: %v", err)
+		message := "User has not created an account yet."
+		return &message, nil
+	}
+	party, err := a.party.QueryDocuments(&[]models.QueryArg{
+		{
+			Path:  "leader",
+			Op:    "==",
+			Value: leaderId,
+		},
+	})
+	if err != nil {
+		message := fmt.Sprintf("You do not appear to be the leader of a party!")
+		return &message, nil
+	}
+	if party.Leader != leaderId {
+		message := fmt.Sprintf("You are not the leader of the party, and do not have kick permissions!")
+		return &message, nil
+	}
+	if party.Leader == kickId {
+		message := fmt.Sprintf("You cannot kick yourself from the party!")
+		return &message, nil
+	}
+	partyMemberInfo, err := a.users.ReadDocument(kickId)
+	if err != nil {
+		a.log.Errorf("error retrieving userInfo: %v", err)
+		message := "User has not created an account yet."
+		return &message, nil
+	}
+	var newParty []string
+	for _, member := range party.Members {
+		if member != kickId {
+			newParty = append(newParty, member)
+		}
+	}
+	party.Members = newParty
+	_, err = a.party.UpdateDocument(*party.ID, party)
+	if err != nil {
+		message := fmt.Sprintf("Failed to kick this party member!")
+		return &message, nil
+	}
+	partyMemberInfo.PartyMembers = nil
+	partyMemberInfo.Party = nil
+	_, err = a.users.UpdateDocument(partyMemberInfo.ID, partyMemberInfo)
+	if err != nil {
+		message := fmt.Sprintf("Failed to kick this party member!")
+		return &message, nil
+	}
+	message := fmt.Sprintf("The party member has been successfully kicked and removed from the party.")
 	return &message, nil
 }
 

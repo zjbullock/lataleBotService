@@ -11,8 +11,15 @@ type User struct {
 	CurrentClass       string                `json:"currentClass" firestore:"currentClass"`
 	ClassMap           map[string]*ClassInfo `json:"classInfo" firestore:"classInfo"`
 	Classes            *[]*ClassInfo         `firestore:"classes,omitempty"`
+	Inventory          Inventory             `json:"inventory" firestore:"inventory"`
 	Party              *string               `json:"party,omitempty" firestore:"party,omitempty"`
 	PartyMembers       *[]string
+}
+
+type Inventory struct {
+	Equipment map[string]interface{} `json:"equipment" firestore:"equipment"`
+	Consume   map[string]interface{} `json:"consume" firestore:"consume"`
+	Event     map[string]interface{} `json:"event" firestore:"event"`
 }
 
 type UserBlob struct {

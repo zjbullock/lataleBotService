@@ -30,12 +30,6 @@ func NewUserRepo(log loggo.Logger, ds datasource.Datasource) UserRepository {
 
 func (u *user) InsertDocument(id *string, data interface{}) (*string, error) {
 	if id != nil {
-		//err := u.ds.OpenConnection()
-		//if err != nil {
-		//	u.log.Errorf("error opening connection to the datasource: %v", err)
-		//	return nil, err
-		//}
-		//defer u.ds.CloseConnection()
 		_, err := u.ds.InsertDocumentWithID(globals.USERS, *id, data)
 		if err != nil {
 			u.log.Errorf("error Inserting Document: %v", err)
