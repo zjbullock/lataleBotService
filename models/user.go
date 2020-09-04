@@ -11,7 +11,7 @@ type User struct {
 	CurrentClass       string                `json:"currentClass" firestore:"currentClass"`
 	ClassMap           map[string]*ClassInfo `json:"classInfo" firestore:"classInfo"`
 	Classes            *[]*ClassInfo         `firestore:"classes,omitempty"`
-	Inventory          Inventory             `json:"inventory" firestore:"inventory"`
+	Inventory          Inventory             `json:"inventory,omitempty" firestore:"inventory,omitempty"`
 	Party              *string               `json:"party,omitempty" firestore:"party,omitempty"`
 	PartyMembers       *[]string
 }
