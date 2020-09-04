@@ -1,4 +1,4 @@
 type LevelRangeInfo {
-    Max: Int!
-    Min: Int!
+    Max: Float!
+    Min: Float!
 }

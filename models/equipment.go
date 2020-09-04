@@ -17,9 +17,9 @@ type Equipment struct {
 type EquipmentSheet struct {
 	Name                string            `json:"name" firestore:"name,omitempty"`
 	ID                  string            `json:"id" firestore:"id,omitempty"`
-	Cost                int32             `json:"cost" firestore:"cost,omitempty"`
-	AccessoryCost       int32             `json:"accessoryCost" firestore:"accessoryCost"`
-	LevelRequirement    int32             `json:"levelRequirement" firestore:"levelRequirement,omitempty"`
+	Cost                int64             `json:"cost" firestore:"cost,omitempty"`
+	AccessoryCost       int64             `json:"accessoryCost" firestore:"accessoryCost"`
+	LevelRequirement    int64             `json:"levelRequirement" firestore:"levelRequirement,omitempty"`
 	TierRequirement     int32             `json:"tierRequirement" firestore:"tierRequirement"`
 	ShoeEvasion         float64           `json:"shoeEvasion" firestore:"shoeEvasion"`
 	GloveAccuracy       float64           `json:"gloveAccuracy" firestore:"gloveAccuracy"`

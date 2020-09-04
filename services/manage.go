@@ -212,7 +212,7 @@ func (m *manage) calculateExpTable(level int) []models.Level {
 		if i == 1 {
 			levels = append(levels, models.Level{Value: 1, Exp: 0})
 		} else {
-			levels = append(levels, models.Level{Value: int32(i), Exp: int32(m.calculateExpForLevel(i))})
+			levels = append(levels, models.Level{Value: int64(i), Exp: int64(m.calculateExpForLevel(i))})
 		}
 	}
 	return levels
@@ -237,7 +237,7 @@ func (m *manage) generateNewUser(user models.User, class, weapon string) models.
 			Shoes:  0,
 		},
 	}
-	beginnerEly := int32(0)
+	beginnerEly := int64(0)
 	return models.User{
 		ID:           user.ID,
 		CurrentClass: strings.Title(strings.ToLower(user.CurrentClass)),

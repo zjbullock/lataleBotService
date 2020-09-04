@@ -13,8 +13,9 @@ func (j *jobClassResolver) Name(_ context.Context) *string {
 	return &j.jobClass.Name
 }
 
-func (j *jobClassResolver) LevelRequirement(_ context.Context) *int32 {
-	return &j.jobClass.LevelRequirement
+func (j *jobClassResolver) LevelRequirement(_ context.Context) *float64 {
+	var levelRequirement = float64(j.jobClass.LevelRequirement)
+	return &levelRequirement
 }
 
 func (j *jobClassResolver) ClassRequirement(_ context.Context) *string {

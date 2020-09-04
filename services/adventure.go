@@ -838,7 +838,7 @@ func (a *adventure) processUpgrade(user *models.User, equipment string) (*string
 	//If the cost is met, decrease user ely by cost, and upgrade specified piece of equipment.
 
 	s := ""
-	cost := int32(0)
+	cost := int64(0)
 	switch equipment {
 	case "glove", "gloves", "body", "shoe", "shoes", "weapon":
 		cost = equipSheet.Cost
@@ -1118,12 +1118,12 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 	}
 	var monsterMap = make(map[string]*[]models.Monster)
 	for _, monster := range area.Monsters {
-		if monsterMap[utils.String(monster.Rank)] == nil {
-			monsterMap[utils.String(monster.Rank)] = &[]models.Monster{}
+		if monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)] == nil {
+			monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)] = &[]models.Monster{}
 		}
-		updatedList := *monsterMap[utils.String(monster.Rank)]
+		updatedList := *monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)]
 		updatedList = append(updatedList, monster)
-		monsterMap[utils.String(monster.Rank)] = &updatedList
+		monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)] = &updatedList
 	}
 
 	a.log.Debugf("monsters possible: %v", monsterMap)
@@ -1191,12 +1191,12 @@ func (a *adventure) generateMonsterBlob(area *models.Area, randSource rand.Sourc
 	rarityGenerator := rand.New(randSource)
 	var monsterMap = make(map[string]*[]models.Monster)
 	for _, monster := range area.Monsters {
-		if monsterMap[utils.String(monster.Rank)] == nil {
-			monsterMap[utils.String(monster.Rank)] = &[]models.Monster{}
+		if monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)] == nil {
+			monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)] = &[]models.Monster{}
 		}
-		updatedList := *monsterMap[utils.String(monster.Rank)]
+		updatedList := *monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)]
 		updatedList = append(updatedList, monster)
-		monsterMap[utils.String(monster.Rank)] = &updatedList
+		monsterMap[utils.ThirtyTwoBitIntToString(monster.Rank)] = &updatedList
 	}
 	a.log.Debugf("monsters possible: %v", monsterMap)
 	for i := 0; i < monsterCount; i++ {
@@ -1526,10 +1526,10 @@ bossBattle:
 			if levelCap.Value > winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
 				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
-				bossExp := int32(float64(boss.Exp*int32(*expGainRate)) * partyBonus)
+				bossExp := int64(float64(boss.Exp*int64(*expGainRate)) * partyBonus)
 				userClassInfo.Exp += bossExp
 				oldEly := *winningUsers.User.Ely
-				bossEly := int32(float64(boss.Ely*int32(*expGainRate)) * partyBonus)
+				bossEly := int64(float64(boss.Ely*int64(*expGainRate)) * partyBonus)
 				oldEly += bossEly
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly
@@ -1544,10 +1544,10 @@ bossBattle:
 			} else if battleWin && levelCap.Value == winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
 				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
-				bossExp := int32(float64(boss.Exp*int32(*expGainRate)) * partyBonus)
+				bossExp := int64(float64(boss.Exp*int64(*expGainRate)) * partyBonus)
 				userClassInfo.Exp += bossExp
 				oldEly := *winningUsers.User.Ely
-				bossEly := int32(float64(boss.Ely*int32(*expGainRate)) * partyBonus)
+				bossEly := int64(float64(boss.Ely*int64(*expGainRate)) * partyBonus)
 				oldEly += bossEly
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly
@@ -1599,13 +1599,13 @@ func (a *adventure) partyBattleLog(users []*models.UserBlob, encounteredMonsters
 	battleWin := false
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGenerator := rand.New(randSource)
-	totalExpReward := int32(0)
-	totalElyReward := int32(0)
+	totalExpReward := int64(0)
+	totalElyReward := int64(0)
 	partyBonus := 1.0 + (float64(len(users)/10.0) * 3.5)
 	monsterNames := ""
 	for _, monster := range encounteredMonsters {
-		totalExpReward += int32(float64(monster.Exp) * partyBonus)
-		totalElyReward += int32(float64(monster.Ely) * partyBonus)
+		totalExpReward += int64(float64(monster.Exp) * partyBonus)
+		totalElyReward += int64(float64(monster.Ely) * partyBonus)
 	}
 	if len(encounteredMonsters) > 1 {
 		for i, monster := range encounteredMonsters {
@@ -1722,11 +1722,11 @@ combat:
 			userInfo := user.User
 			if levelCap.Value > user.User.ClassMap[user.User.CurrentClass].Level {
 				userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
-				monsterExp := totalExpReward / int32(len(users)) * int32(*expGainRate)
+				monsterExp := totalExpReward / int64(len(users)) * int64(*expGainRate)
 				userClassInfo.Exp += monsterExp
-				monsterEly := totalElyReward / int32(len(users)) * int32(*expGainRate)
+				monsterEly := totalElyReward / int64(len(users)) * int64(*expGainRate)
 				oldEly := *user.User.Ely
-				oldEly += totalElyReward / int32(len(users)) * int32(*expGainRate)
+				oldEly += totalElyReward / int64(len(users)) * int64(*expGainRate)
 				userInfo.Ely = &oldEly
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.User.Name, utils.String(monsterExp), monsterEly))
 				newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, user.User, levelCap.Value)
@@ -1738,11 +1738,11 @@ combat:
 				adventureLog = newAdventureLog
 			} else if battleWin && levelCap.Value == user.User.ClassMap[user.User.CurrentClass].Level {
 				userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
-				monsterExp := totalExpReward / int32(len(users)) * int32(*expGainRate)
+				monsterExp := totalExpReward / int64(len(users)) * int64(*expGainRate)
 				userClassInfo.Exp += monsterExp
-				monsterEly := totalElyReward / int32(len(users)) * int32(*expGainRate)
+				monsterEly := totalElyReward / int64(len(users)) * int64(*expGainRate)
 				oldEly := *user.User.Ely
-				oldEly += totalElyReward / int32(len(users)) * int32(*expGainRate)
+				oldEly += totalElyReward / int64(len(users)) * int64(*expGainRate)
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.User.Name, utils.String(monsterExp), monsterEly))
@@ -1870,9 +1870,9 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		if err != nil {
 			return nil, err
 		}
-		monsterExp := monster.Exp * int32(*expGainRate)
+		monsterExp := monster.Exp * int64(*expGainRate)
 		userClassInfo.Exp += monsterExp
-		monsterEly := monster.Ely * int32(*expGainRate)
+		monsterEly := monster.Ely * int64(*expGainRate)
 		*user.Ely += monsterEly
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
 		a.log.Debugf("userClassInfo: %v\n", userClassInfo)
@@ -1891,9 +1891,9 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		if err != nil {
 			return nil, err
 		}
-		monsterExp := monster.Exp * int32(*expGainRate)
+		monsterExp := monster.Exp * int64(*expGainRate)
 		userClassInfo.Exp += monsterExp
-		monsterEly := monster.Ely * int32(*expGainRate)
+		monsterEly := monster.Ely * int64(*expGainRate)
 		*user.Ely += monsterEly
 		user.ClassMap[user.CurrentClass] = &userClassInfo
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
@@ -1910,7 +1910,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	return adventureLog, nil
 }
 
-func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int32) (models.ClassInfo, []string, error) {
+func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int64) (models.ClassInfo, []string, error) {
 	level, err := a.levels.ReadDocument(utils.String(userClassInfo.Level))
 	if err != nil {
 		a.log.Errorf("error getting level data: %v", err)

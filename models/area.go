@@ -8,6 +8,6 @@ type Area struct {
 }
 
 type LevelRange struct {
-	Max int32 `json:"max" firestore:"max"`
-	Min int32 `json:"min" firestore:"min"`
+	Max int64 `json:"max" firestore:"max"`
+	Min int64 `json:"min" firestore:"min"`
 }
