@@ -9,7 +9,7 @@ import (
 )
 
 type Damage interface {
-	DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32, boss bool) (string, int)
+	DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int64, boss bool) (string, int)
 	DetermineBossDamage(randGenerator *rand.Rand, user models.UserBlob, boss *models.Monster, bossSkill *models.BossSkill) (*models.UserBlob, string, int)
 }
 
@@ -62,7 +62,7 @@ func (d *damage) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 	return updatedUser, damageLog, roundedDamage
 }
 
-func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32, boss bool) (string, int) {
+func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int64, boss bool) (string, int) {
 
 	evasionChance := randGenerator.Float64()
 	accuracy := attacker.Accuracy

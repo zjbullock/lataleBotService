@@ -158,6 +158,18 @@ func (r *Resolver) JoinParty(ctx context.Context, args struct {
 	return partyMessage, nil
 }
 
+func (r *Resolver) KickFromParty(ctx context.Context, args struct {
+	Id     string
+	KickId string
+}) (*string, error) {
+	partyMessage, err := r.Services.Adventure.KickParty(args.Id, args.KickId)
+	if err != nil {
+		r.Log.Errorf("error joining the party: %v", err)
+		return nil, err
+	}
+	return partyMessage, nil
+}
+
 func (r *Resolver) LeaveParty(ctx context.Context, args struct {
 	Id string
 }) (*string, error) {

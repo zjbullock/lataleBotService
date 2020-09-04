@@ -1,4 +1,4 @@
 type Level {
-    Value: Int!
-    Exp: Int!
+    Value: Float!
+    Exp: Float!
 }

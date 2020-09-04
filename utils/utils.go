@@ -1,6 +1,12 @@
 package utils
 
-func String(n int32) string {
+import "strconv"
+
+func String(n int64) string {
+	return strconv.FormatInt(n, 10)
+}
+
+func ThirtyTwoBitIntToString(n int32) string {
 	buf := [11]byte{}
 	pos := len(buf)
 	i := int64(n)

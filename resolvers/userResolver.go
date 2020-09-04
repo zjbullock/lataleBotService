@@ -17,8 +17,12 @@ func (u *userResolver) ID(_ context.Context) string {
 	return u.user.ID
 }
 
-func (u *userResolver) Ely(_ context.Context) *int32 {
-	return u.user.Ely
+func (u *userResolver) Ely(_ context.Context) *float64 {
+	if u.user.Ely == nil {
+		return nil
+	}
+	ely := float64(*u.user.Ely)
+	return &ely
 }
 
 func (u *userResolver) CurrentClass(_ context.Context) string {

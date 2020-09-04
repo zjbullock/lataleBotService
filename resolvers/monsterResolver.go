@@ -13,16 +13,16 @@ func (m *monsterResolver) Name(_ context.Context) string {
 	return m.monsterInfo.Name
 }
 
-func (m *monsterResolver) Level(_ context.Context) int32 {
-	return m.monsterInfo.Level
+func (m *monsterResolver) Level(_ context.Context) float64 {
+	return float64(m.monsterInfo.Level)
 }
 
-func (m *monsterResolver) Exp(_ context.Context) int32 {
-	return m.monsterInfo.Exp
+func (m *monsterResolver) Exp(_ context.Context) float64 {
+	return float64(m.monsterInfo.Exp)
 }
 
-func (m *monsterResolver) Ely(_ context.Context) int32 {
-	return m.monsterInfo.Ely
+func (m *monsterResolver) Ely(_ context.Context) float64 {
+	return float64(m.monsterInfo.Ely)
 }
 
 func (m *monsterResolver) Rank(_ context.Context) int32 {

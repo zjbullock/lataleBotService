@@ -1,7 +1,7 @@
 type UserInfo {
     Name: String!
     ID: String!
-    Ely: Int
+    Ely: Float
     CurrentClass: String!
     Classes: [UserClassInfo]
     PartyMembers: [String!]

@@ -5,14 +5,21 @@ import "time"
 type User struct {
 	Name               string                `json:"name" firestore:"name"`
 	ID                 string                `json:"id" firestore:"id"`
-	Ely                *int32                `json:"ely" firestore:"ely"`
+	Ely                *int64                `json:"ely" firestore:"ely"`
 	LastActionTime     time.Time             `json:"lastActionTime" firestore:"lastActionTime"`
 	LastBossActionTime time.Time             `json:"lastBossActionTime" firestore:"lastBossActionTime"`
 	CurrentClass       string                `json:"currentClass" firestore:"currentClass"`
 	ClassMap           map[string]*ClassInfo `json:"classInfo" firestore:"classInfo"`
 	Classes            *[]*ClassInfo         `firestore:"classes,omitempty"`
+	Inventory          Inventory             `json:"inventory,omitempty" firestore:"inventory,omitempty"`
 	Party              *string               `json:"party,omitempty" firestore:"party,omitempty"`
 	PartyMembers       *[]string
+}
+
+type Inventory struct {
+	Equipment map[string]interface{} `json:"equipment" firestore:"equipment"`
+	Consume   map[string]interface{} `json:"consume" firestore:"consume"`
+	Event     map[string]interface{} `json:"event" firestore:"event"`
 }
 
 type UserBlob struct {
@@ -21,7 +28,7 @@ type UserBlob struct {
 	User               *User
 	CurrentHP          int
 	MaxHP              int
-	UserLevel          int32
+	UserLevel          int64
 	Weapon             string
 	CrowdControlled    *int32
 	CrowdControlStatus *string
@@ -30,7 +37,7 @@ type UserBlob struct {
 type MonsterBlob struct {
 	CurrentHP    int32
 	Name         string
-	Ely          int32
-	Exp          int32
+	Ely          int64
+	Exp          int64
 	StatModifier *StatModifier
 }
