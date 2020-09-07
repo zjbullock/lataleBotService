@@ -1,6 +1,6 @@
 package models
 
-type Equipment struct {
+type OldEquipmentSystem struct {
 	Weapon         int      `json:"weapon" firestore:"weapon"`
 	Body           int      `json:"body" firestore:"body"`
 	Glove          int      `json:"glove" firestore:"glove"`
@@ -14,7 +14,22 @@ type Equipment struct {
 	EquipmentNames []string `json:"equipmentNames,omitempty" firestore:"equipmentNames,omitempty"`
 }
 
-type EquipmentSheet struct {
+type Equipment struct {
+	Weapon    Item  `json:"weapon" firestore:"weapon"`
+	Top       Item  `json:"top" firestore:"top"`
+	Headpiece Item  `json:"headpiece" firestore:"headpiece"`
+	Bottom    Item  `json:"bottom" firestore:"bottom"`
+	Glove     Item  `json:"gloves" firestore:"gloves"`
+	Shoes     Item  `json:"boots" firestore:"boots"`
+	Bindi     *Item `json:"bindi" firestore:"bindi,omitempty"`
+	Glasses   *Item `json:"glasses" firestore:"glasses,omitempty"`
+	Earring   *Item `json:"earrings" firestore:"earrings,omitempty"`
+	Ring      *Item `json:"ring" firestore:"ring,omitempty"`
+	Cloak     *Item `json:"cloak" firestore:"cloak,omitempty"`
+	Stockings *Item `json:"stockings" firestore:"stockings,omitempty"`
+}
+
+type OldEquipmentSheet struct {
 	Name                string            `json:"name" firestore:"name,omitempty"`
 	ID                  string            `json:"id" firestore:"id,omitempty"`
 	Cost                int64             `json:"cost" firestore:"cost,omitempty"`

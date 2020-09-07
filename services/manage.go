@@ -8,6 +8,7 @@ import (
 	"lataleBotService/repositories"
 	"lataleBotService/utils"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -16,10 +17,12 @@ type Manage interface {
 	AddNewClass(class *models.JobClass) (*string, error)
 	AddNewArea(area models.Area) (*string, error)
 	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
+	ConvertToInventorySystemBatch() (*string, error)
+	AddNewItem(item *models.Item) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
 	CreateExpTable(levels []models.Level) (*[]models.Level, error)
 	ToggleExpEvent(expRate int) error
-	AddNewEquipmentSheet(equipment models.EquipmentSheet) (*string, error)
+	AddNewEquipmentSheet(equipment models.OldEquipmentSheet) (*string, error)
 	AddNewBoss(boss models.Monster) (*string, error)
 }
 
@@ -31,10 +34,11 @@ type manage struct {
 	equipment repositories.EquipmentRepository
 	config    repositories.ConfigRepository
 	boss      repositories.BossRepository
+	item      repositories.ItemRepository
 	log       loggo.Logger
 }
 
-func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, log loggo.Logger) Manage {
+func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, item repositories.ItemRepository, log loggo.Logger) Manage {
 	return &manage{
 		areas:     areas,
 		classes:   classes,
@@ -43,14 +47,135 @@ func NewManageService(areas repositories.AreasRepository, levels repositories.Le
 		equipment: equip,
 		config:    config,
 		boss:      boss,
+		item:      item,
 		log:       log,
 	}
+}
+
+func (m *manage) ConvertToInventorySystemBatch() (*string, error) {
+	users, err := m.users.QueryDocuments(nil)
+	if err != nil {
+		m.log.Errorf("error getting users: %v", err)
+		return nil, err
+	}
+	oldEquipMap := make(map[int]*models.OldEquipmentSheet)
+	for i := 0; i < 7; i++ {
+		equipmentSheet, err := m.equipment.ReadDocument(strconv.Itoa(i))
+		if err != nil {
+			m.log.Errorf("error getting equipment sheets")
+			return nil, err
+		}
+		oldEquipMap[i] = equipmentSheet
+	}
+
+	m.log.Debugf("users: %v", users)
+	for _, user := range *users {
+		err := m.updateUserToInventorySystem(&user, oldEquipMap)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
+}
+
+func (m *manage) updateUserToInventorySystem(user *models.User, oldEquipMap map[int]*models.OldEquipmentSheet) error {
+	//Iterate over user classes to begin changing the old equipment to the new type
+	copyUser := user
+	newClassMap := map[string]*models.ClassInfo{}
+	for _, class := range user.ClassMap {
+		classInfo := class
+		classInfo.Equipment.Weapon = m.changeEquipToNewEquipType("Weapon", class.CurrentWeapon, oldEquipMap[class.OldEquipmentSheet.Weapon])
+		classInfo.Equipment.Top = m.changeEquipToNewEquipType("Top", nil, oldEquipMap[class.OldEquipmentSheet.Body])
+		classInfo.Equipment.Bottom = m.changeEquipToNewEquipType("Bottom", nil, oldEquipMap[class.OldEquipmentSheet.Body])
+		classInfo.Equipment.Headpiece = m.changeEquipToNewEquipType("Headpiece", nil, oldEquipMap[class.OldEquipmentSheet.Body])
+		classInfo.Equipment.Glove = m.changeEquipToNewEquipType("Gloves", nil, oldEquipMap[class.OldEquipmentSheet.Glove])
+		classInfo.Equipment.Shoes = m.changeEquipToNewEquipType("Boots", nil, oldEquipMap[class.OldEquipmentSheet.Shoes])
+		if class.OldEquipmentSheet.Bindi != nil {
+			bindi := m.changeEquipToNewEquipType("Bindi", nil, oldEquipMap[*class.OldEquipmentSheet.Bindi])
+			classInfo.Equipment.Bindi = &bindi
+			glasses := m.changeEquipToNewEquipType("Glasses", nil, oldEquipMap[*class.OldEquipmentSheet.Glasses])
+			classInfo.Equipment.Glasses = &glasses
+			earrings := m.changeEquipToNewEquipType("Earrings", nil, oldEquipMap[*class.OldEquipmentSheet.Earring])
+			classInfo.Equipment.Earring = &earrings
+			rings := m.changeEquipToNewEquipType("Ring", nil, oldEquipMap[*class.OldEquipmentSheet.Ring])
+			classInfo.Equipment.Ring = &rings
+			cloak := m.changeEquipToNewEquipType("Cloak", nil, oldEquipMap[*class.OldEquipmentSheet.Cloak])
+			classInfo.Equipment.Cloak = &cloak
+			stockings := m.changeEquipToNewEquipType("Stockings", nil, oldEquipMap[*class.OldEquipmentSheet.Stockings])
+			classInfo.Equipment.Stockings = &stockings
+		}
+		newClassMap[class.Name] = classInfo
+		newClassMap[class.Name].OldEquipmentSheet = nil
+		newClassMap[class.Name].CurrentWeapon = nil
+	}
+	copyUser.ClassMap = newClassMap
+	_, err := m.users.UpdateDocument(copyUser.ID, copyUser)
+	if err != nil {
+		m.log.Errorf("error updating user:%v", err)
+		return err
+	}
+	return nil
+}
+
+func (m *manage) changeEquipToNewEquipType(equipmentType string, currentWeapon *string, sheet *models.OldEquipmentSheet) models.Item {
+	m.log.Debugf("equipmentType: %v", equipmentType)
+
+	queryArgs := &[]models.QueryArg{}
+	if equipmentType == "Weapon" {
+		m.log.Debugf("currentWeapon: %v", sheet.LevelRequirement)
+		m.log.Debugf("currentWeapon: %s", *currentWeapon)
+		queryArgs = &[]models.QueryArg{
+			{
+				Path:  "levelRequirement",
+				Op:    "==",
+				Value: int(sheet.LevelRequirement),
+			},
+			{
+				Path:  "type.weaponType",
+				Op:    "==",
+				Value: *currentWeapon,
+			},
+		}
+	} else {
+		queryArgs = &[]models.QueryArg{
+			{
+				Path:  "levelRequirement",
+				Op:    "==",
+				Value: int(sheet.LevelRequirement),
+			},
+			{
+				Path:  "type.weaponType",
+				Op:    "==",
+				Value: equipmentType,
+			},
+		}
+	}
+	items, err := m.item.QueryDocuments(queryArgs)
+	if err != nil {
+		m.log.Errorf("error querying for items: %v", err)
+		panic("error encountered while getting items in batch")
+	}
+	m.log.Errorf("items: %v", items)
+	return items[0]
 }
 
 func (m *manage) AddNewBoss(boss models.Monster) (*string, error) {
 	id, err := m.boss.InsertDocument(&boss.Name, boss)
 	if err != nil {
 		m.log.Errorf("error inserting document for boss: %v", err)
+		return nil, err
+	}
+	return id, nil
+}
+
+func (m *manage) AddNewItem(item *models.Item) (*string, error) {
+	if !utils.ValidItemType(item.Type) {
+		message := fmt.Sprintf("An invalid piece of equipment was entered")
+		return &message, nil
+	}
+	id, err := m.item.InsertDocument(item)
+	if err != nil {
+		m.log.Errorf("error adding new item: %v", err)
 		return nil, err
 	}
 	return id, nil
@@ -192,7 +317,7 @@ func (m *manage) AddNewUser(user models.User, weapon string) (*string, *string, 
 	return nil, &message, nil
 }
 
-func (m *manage) AddNewEquipmentSheet(equipment models.EquipmentSheet) (*string, error) {
+func (m *manage) AddNewEquipmentSheet(equipment models.OldEquipmentSheet) (*string, error) {
 	var weaponMap = make(map[string]string)
 	for _, weapon := range equipment.WeaponList {
 		weaponMap[weapon.Type] = weapon.Name
@@ -224,17 +349,108 @@ func (m *manage) calculateExpForLevel(level int) int {
 }
 
 func (m *manage) generateNewUser(user models.User, class, weapon string) models.User {
+	startingWeapon, err := m.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "levelRequirement",
+			Op:    "==",
+			Value: 1,
+		},
+		{
+			Path:  "type.weaponType",
+			Op:    "==",
+			Value: weapon,
+		},
+	})
+	if err != nil {
+		panic("error getting weapons")
+	}
+	top, err := m.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "levelRequirement",
+			Op:    "==",
+			Value: 1,
+		},
+		{
+			Path:  "type.weaponType",
+			Op:    "==",
+			Value: "Top",
+		},
+	})
+	if err != nil {
+		panic("error getting tops")
+	}
+	bottom, err := m.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "levelRequirement",
+			Op:    "==",
+			Value: 1,
+		},
+		{
+			Path:  "type.weaponType",
+			Op:    "==",
+			Value: "Bottom",
+		},
+	})
+	if err != nil {
+		panic("error getting tops")
+	}
+	headpiece, err := m.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "levelRequirement",
+			Op:    "==",
+			Value: 1,
+		},
+		{
+			Path:  "type.weaponType",
+			Op:    "==",
+			Value: "Headpiece",
+		},
+	})
+	if err != nil {
+		panic("error getting headpieces")
+	}
+	gloves, err := m.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "levelRequirement",
+			Op:    "==",
+			Value: 1,
+		},
+		{
+			Path:  "type.weaponType",
+			Op:    "==",
+			Value: "Gloves",
+		},
+	})
+	if err != nil {
+		panic("error getting gloves")
+	}
+	boots, err := m.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "levelRequirement",
+			Op:    "==",
+			Value: 1,
+		},
+		{
+			Path:  "type.weaponType",
+			Op:    "==",
+			Value: "Boots",
+		},
+	})
+	if err != nil {
+		panic("error getting boots")
+	}
 	newClass := make(map[string]*models.ClassInfo)
 	newClass[strings.Title(strings.ToLower(user.CurrentClass))] = &models.ClassInfo{
-		Name:          class,
-		Level:         1,
-		Exp:           0,
-		CurrentWeapon: weapon,
+		Name:  class,
+		Level: 1,
+		Exp:   0,
 		Equipment: models.Equipment{
-			Weapon: 0,
-			Body:   0,
-			Glove:  0,
-			Shoes:  0,
+			Weapon:    *startingWeapon,
+			Top:       *top,
+			Bottom:    *bottom,
+			Headpiece: *headpiece,
+			Glove:     *gloves,
+			Shoes:     *boots,
 		},
 	}
 	beginnerEly := int64(0)

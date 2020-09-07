@@ -29,7 +29,6 @@ func (c *classResolver) Equipment(_ context.Context) *equipmentResolver {
 
 func (c *classResolver) BossBonuses(_ context.Context) *[]string {
 	var bossBonuses []string
-	bossBonuses = append(bossBonuses, fmt.Sprintf("ID:		|		Name:"))
 	if c.classInfo.BossBonuses != nil {
 		var bossBonusSorting []struct {
 			ID   int32

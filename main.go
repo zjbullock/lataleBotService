@@ -62,6 +62,7 @@ func init() {
 		config  repositories.ConfigRepository
 		party   repositories.PartyRepository
 		boss    repositories.BossRepository
+		item    repositories.ItemRepository
 	}{
 		area:    repositories.NewAreaRepo(l, ds),
 		classes: repositories.NewClassRepo(l, ds),
@@ -71,14 +72,15 @@ func init() {
 		config:  repositories.NewConfigRepo(l, ds),
 		party:   repositories.NewPartiesRepo(l, ds),
 		boss:    repositories.NewBossRepository(l, ds),
+		item:    repositories.NewItemRepo(l, ds),
 	}
 	service := struct {
 		Adventure services.Adventure
 		Manage    services.Manage
 		Damage    services.Damage
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, repos.boss, l),
-		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, repos.boss, l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, repos.boss, repos.item, l),
+		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, repos.boss, repos.item, l),
 		Damage:    services.NewDamageService(l),
 	}
 	handlerFuncs = &handler.Funcs{

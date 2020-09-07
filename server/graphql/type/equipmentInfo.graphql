@@ -1,12 +1,14 @@
 type EquipmentInfo {
-    Body: String!
-    Glove: String!
-    Shoes: String!
-    Weapon: String!
-    Bindi: String!
-    Glasses: String!
-    Earrings: String!
-    Ring: String!
-    Cloak: String!
-    Stockings: String!
+    Top: ItemInfo!
+    Bottom: ItemInfo!
+    Headpiece: ItemInfo!
+    Gloves: ItemInfo!
+    Boots: ItemInfo!
+    Weapon: ItemInfo!
+    Bindi: ItemInfo
+    Glasses: ItemInfo
+    Earrings: ItemInfo
+    Ring: ItemInfo
+    Cloak: ItemInfo
+    Stockings: ItemInfo
 }

@@ -1,0 +1,14 @@
+type ItemInfo {
+    Name: String!
+    Type: ItemTypeInfo!
+    LevelRequirement: Float
+    Shop: Boolean!
+    Description: String
+    Cost: Int
+    Stats: StatInfo
+}
+
+type ItemTypeInfo {
+    Type: String!
+    WeaponType: String
+}
