@@ -1,11 +1,14 @@
 input Equipment {
-    Weapon: Int!
-    Body: Int!
-    Glove: Int!
-    Shoes: Int!
-    Bindi: Int
-    Glasses: Int
-    Earring: Int
-    Ring: Int
-    Cloak: Int
+    Top: String!
+    Bottom: String!
+    Headpiece: String!
+    Glove: String!
+    Shoes: String!
+    Weapon: String!
+    Bindi: String
+    Glasses: String
+    Earring: String
+    Ring: String
+    Cloak: String
+    Stockings: String
 }

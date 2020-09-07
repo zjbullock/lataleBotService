@@ -1,6 +1,9 @@
 package utils
 
-import "strconv"
+import (
+	"lataleBotService/models"
+	"strconv"
+)
 
 func String(n int64) string {
 	return strconv.FormatInt(n, 10)
@@ -25,4 +28,46 @@ func ThirtyTwoBitIntToString(n int32) string {
 			return string(buf[pos:])
 		}
 	}
+}
+
+func ValidItemType(itemType models.ItemType) bool {
+	if itemType.Type == "armor" {
+		validArmorTypes := map[string]bool{
+			"Headpiece": true,
+			"Top":       true,
+			"Bottom":    true,
+			"Boots":     true,
+			"Gloves":    true,
+			"Bindi":     true,
+			"Earrings":  true,
+			"Ring":      true,
+			"Glasses":   true,
+			"Stockings": true,
+			"Cloak":     true,
+		}
+		return validArmorTypes[*itemType.WeaponType]
+	} else if itemType.Type == "weapon" {
+		validWeaponTypes := map[string]bool{
+			"Dagger":       true,
+			"Crossbow":     true,
+			"Bow":          true,
+			"Doubleblades": true,
+			"Dualpistols":  true,
+			"Greatsword":   true,
+			"Guitar":       true,
+			"Knuckles":     true,
+			"Longsword":    true,
+			"Mace":         true,
+			"Mg":           true,
+			"Orb":          true,
+			"Spear":        true,
+			"Staff":        true,
+		}
+		return validWeaponTypes[*itemType.WeaponType]
+	} else if itemType.Type == "consumable" {
+
+	} else if itemType.Type == "event" {
+
+	}
+	return false
 }

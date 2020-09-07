@@ -2,12 +2,14 @@ type Query {
     GetUserBaseStats(id: String!): StatResponse
     GetClassInfo(id: String!): JobClassResponse
     GetAdventure(areaId: String!, userId: String!): AdventureResponse
-    GetUpgradeCost(id: String!, equipment: String!): String
     GetUserInfo(id: String!): UserResponse
+    GetUserInventory(id: String!): InventoryResponse
+    GetShopInventory(id: String!): [ItemInfo]
     GetArea(id: String!): AreaResponse
     GetAreaList: [AreaInfo!]
     GetBossList(id: String!): [String!]
     GetBossBonus(id: String!): StatInfo
     GetJobList: [JobClassInfo]
     GetBossFight(bossId: String!, userId: String!): AdventureResponse
+    GetItemInfo(itemName: String!): ItemInfoResponse
 }

@@ -16,7 +16,7 @@ type user struct {
 type UserRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
 	ReadDocument(id string) (user *models.User, err error)
-	QueryDocuments(args []models.QueryArg) error
+	QueryDocuments(args *[]models.QueryArg) (*[]models.User, error)
 	UpdateDocument(docId string, user *models.User) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
 }
@@ -62,8 +62,24 @@ func (u *user) ReadDocument(id string) (userInfo *models.User, err error) {
 	return &user, nil
 }
 
-func (u *user) QueryDocuments(args []models.QueryArg) error {
-	panic("implement me")
+func (u *user) QueryDocuments(args *[]models.QueryArg) (*[]models.User, error) {
+	docs, err := u.ds.QueryCollection(globals.USERS, args)
+	if err != nil {
+		u.log.Errorf("error querying for documents with error: %v", err)
+		return nil, err
+	}
+	var users []models.User
+	for _, doc := range docs {
+		user := models.User{}
+		err := doc.DataTo(&user)
+		if err != nil {
+			u.log.Errorf("error converting doc to area with error: %v", err)
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	u.log.Debugf("classes: %v", users)
+	return &users, nil
 }
 
 func (u *user) UpdateDocument(docId string, user *models.User) (*time.Time, error) {

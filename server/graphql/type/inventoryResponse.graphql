@@ -1,0 +1,15 @@
+type InventoryResponse {
+    Inventory: Inventory
+    Message: String
+}
+
+type Inventory {
+    Equipment: [BasicInventoryItem]
+    Consume: [BasicInventoryItem]
+    Event: [BasicInventoryItem]
+}
+
+type BasicInventoryItem {
+    Name: String!
+    Count: Int!
+}

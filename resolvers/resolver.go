@@ -6,6 +6,7 @@ import (
 	"github.com/juju/loggo"
 	"lataleBotService/models"
 	"lataleBotService/services"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -107,6 +108,53 @@ func (r *Resolver) AddNewArea(ctx context.Context, args struct{ Area models.Area
 	return id, nil
 }
 
+func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
+	message, err := r.Services.Adventure.EquipItem(args.Id, strings.Title(strings.ToLower(strings.TrimSpace(args.Name))))
+	if err != nil {
+		r.Log.Errorf("error equipping specified item")
+		return nil, err
+	}
+	return message, err
+}
+
+func (r *Resolver) BuyItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
+	message, err := r.Services.Adventure.BuyItem(args.Id, strings.Title(strings.ToLower(strings.TrimSpace(args.Name))))
+	if err != nil {
+		r.Log.Errorf("error equipping specified item")
+		return nil, err
+	}
+	return message, err
+}
+
+func (r *Resolver) GetUserInventory(ctx context.Context, args struct{ Id string }) (*inventoryResponseResolver, error) {
+	inventory, message, err := r.Services.Adventure.GetUserInventory(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting user inventory: %v", err)
+		return nil, err
+	}
+	return &inventoryResponseResolver{inventory: inventory, message: message}, nil
+}
+
+func (r *Resolver) GetShopInventory(ctx context.Context, args struct{ Id string }) (*[]*itemInfoResolver, error) {
+	items, err := r.Services.Adventure.GetShopInventory(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting user inventory: %v", err)
+		return nil, err
+	}
+	if items != nil && len(*items) == 0 {
+		return nil, nil
+	}
+	var sortedItems = *items
+	sort.Slice(sortedItems, func(i, j int) bool {
+		return *sortedItems[i].LevelRequirement > *sortedItems[j].LevelRequirement
+	})
+	var itemResolvers []*itemInfoResolver
+	for _, item := range sortedItems {
+		itemResolvers = append(itemResolvers, &itemInfoResolver{item: item})
+	}
+	return &itemResolvers, nil
+}
+
 func (r *Resolver) AddNewClass(ctx context.Context, args struct{ Class models.JobClass }) (*string, error) {
 	id, err := r.Services.Manage.AddNewClass(&args.Class)
 	if err != nil {
@@ -128,15 +176,6 @@ func (r *Resolver) AddNewUser(ctx context.Context, args struct {
 	return &newUserResolver{newUserResponse: models.NewUserResponse{ID: id, Message: message}}, nil
 }
 
-func (r *Resolver) AddNewEquipmentSheet(ctx context.Context, args struct{ Equipment models.EquipmentSheet }) (*string, error) {
-	id, err := r.Services.Manage.AddNewEquipmentSheet(args.Equipment)
-	if err != nil {
-		r.Log.Errorf("error adding new equipment sheet: %v", err)
-		return nil, err
-	}
-	return id, nil
-}
-
 func (r *Resolver) AddNewParty(ctx context.Context, args struct{ Id string }) (*string, error) {
 	partyAddMessage, err := r.Services.Adventure.CreateParty(args.Id)
 	if err != nil {
@@ -144,6 +183,23 @@ func (r *Resolver) AddNewParty(ctx context.Context, args struct{ Id string }) (*
 		return nil, err
 	}
 	return partyAddMessage, nil
+}
+
+func (r *Resolver) AddNewItem(ctx context.Context, args struct{ Item models.Item }) (*string, error) {
+	id, err := r.Services.Manage.AddNewItem(&args.Item)
+	if err != nil {
+		return nil, err
+	}
+	return id, nil
+}
+
+func (r *Resolver) GetItemInfo(ctx context.Context, args struct{ ItemName string }) (*itemResponseResolver, error) {
+	itemInfo, message, err := r.Services.Adventure.GetItemInfo(strings.Title(strings.ToLower(strings.TrimSpace(args.ItemName))))
+	if err != nil {
+		r.Log.Errorf("error retrieving info for the specified item: %v", err)
+		return nil, err
+	}
+	return &itemResponseResolver{item: itemInfo, message: message}, nil
 }
 
 func (r *Resolver) JoinParty(ctx context.Context, args struct {
@@ -234,6 +290,14 @@ func (r *Resolver) GetUserInfo(ctx context.Context, args struct{ Id string }) (*
 	return &userResponseResolver{user: user, message: message}, err
 }
 
+func (r *Resolver) ConvertToInventory(_ context.Context) (*string, error) {
+	message, err := r.Services.Manage.ConvertToInventorySystemBatch()
+	if err != nil {
+		return nil, err
+	}
+	return message, nil
+}
+
 func (r *Resolver) GetBossBonus(ctx context.Context, args struct{ Id string }) (*statResolver, error) {
 	bossId, err := strconv.ParseInt(args.Id, 10, 32)
 	if err != nil {
@@ -273,18 +337,6 @@ func (r *Resolver) GetUserClassInfo(ctx context.Context, args struct{ Id string 
 	panic("Implement Me!")
 }
 
-func (r *Resolver) UpgradeEquipment(ctx context.Context, args struct {
-	Id        string
-	Equipment string
-}) (*string, error) {
-	msg, err := r.Services.Adventure.UpdateEquipmentPiece(args.Id, strings.ToLower(args.Equipment))
-	if err != nil {
-		r.Log.Errorf("error updating equipment piece: %v", err)
-		return nil, err
-	}
-	return msg, nil
-}
-
 func (r *Resolver) JobAdvance(ctx context.Context, args struct {
 	Id     string
 	Class  string
@@ -295,19 +347,6 @@ func (r *Resolver) JobAdvance(ctx context.Context, args struct {
 		r.Log.Errorf("error class advancing: %v", err)
 		return nil, err
 	}
-	return message, nil
-}
-
-func (r *Resolver) GetUpgradeCost(ctx context.Context, args struct {
-	Id        string
-	Equipment string
-}) (*string, error) {
-	message, err := r.Services.Adventure.GetEquipmentPieceCost(args.Id, strings.ToLower(args.Equipment))
-	if err != nil {
-		r.Log.Errorf("error getting equipment cost: %v", err)
-		return nil, err
-	}
-
 	return message, nil
 }
 
