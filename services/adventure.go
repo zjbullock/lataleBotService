@@ -1548,6 +1548,11 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 		message := fmt.Sprintf("You do not have enough funds to complete the purchase of the %s")
 		return &message, nil
 	}
+	if user.Inventory.Equipment == nil {
+		user.Inventory.Equipment = make(map[string]int)
+		user.Inventory.Event = make(map[string]int)
+		user.Inventory.Consume = make(map[string]int)
+	}
 	user.Inventory.Equipment[itemData.Name]++
 	ely := *user.Ely
 	ely -= int64(*itemData.Cost)
