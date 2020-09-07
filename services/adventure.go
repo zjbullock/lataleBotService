@@ -154,7 +154,7 @@ func (a *adventure) GetShopInventory(id string) (*[]models.Item, error) {
 			{
 				Path:  "levelRequirement",
 				Op:    "<=",
-				Value: user.ClassMap[user.CurrentClass].Level,
+				Value: user.ClassMap[user.CurrentClass].Level + 10,
 			},
 			{
 				Path:  "shop",
@@ -178,7 +178,7 @@ func (a *adventure) GetShopInventory(id string) (*[]models.Item, error) {
 		{
 			Path:  "levelRequirement",
 			Op:    "<=",
-			Value: user.ClassMap[user.CurrentClass].Level,
+			Value: user.ClassMap[user.CurrentClass].Level + 10,
 		},
 		{
 			Path:  "shop",
