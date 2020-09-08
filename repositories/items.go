@@ -58,6 +58,9 @@ func (i *item) QueryForDocument(args *[]models.QueryArg) (*models.Item, error) {
 		}
 		items = append(items, item)
 	}
+	if len(items) == 0 {
+		return nil, nil
+	}
 
 	return &items[0], nil
 }

@@ -118,7 +118,16 @@ func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }
 }
 
 func (r *Resolver) BuyItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
-	message, err := r.Services.Adventure.BuyItem(args.Id, strings.Title(strings.ToLower(strings.TrimSpace(args.Name))))
+	message, err := r.Services.Adventure.BuyItem(args.Id, strings.TrimSpace(args.Name))
+	if err != nil {
+		r.Log.Errorf("error equipping specified item")
+		return nil, err
+	}
+	return message, err
+}
+
+func (r *Resolver) SellItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
+	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name))
 	if err != nil {
 		r.Log.Errorf("error equipping specified item")
 		return nil, err
