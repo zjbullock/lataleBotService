@@ -1538,6 +1538,11 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 			Op:    "==",
 			Value: item,
 		},
+		{
+			Path:  "shop",
+			Op:    "==",
+			Value: true,
+		},
 	})
 	if err != nil {
 		a.log.Errorf("error getting item info: %v", err)
