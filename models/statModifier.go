@@ -13,3 +13,19 @@ type StatModifier struct {
 	Recovery               float64 `json:"recovery" firestore:"recovery"`
 	SkillDamageModifier    float64 `json:"skillDamageModifier" firestore:"skillDamageModifier"`
 }
+
+func (s StatModifier) AddStatModifier(stat StatModifier) StatModifier {
+	newStats := s
+	newStats.CriticalRate += stat.CriticalRate
+	newStats.MaxDPS += stat.MaxDPS
+	newStats.MinDPS += stat.MinDPS
+	newStats.CriticalDamageModifier += stat.CriticalDamageModifier
+	newStats.Defense += stat.Defense
+	newStats.Accuracy += stat.Accuracy
+	newStats.Evasion += stat.Evasion
+	newStats.HP += stat.HP
+	newStats.SkillProcRate += stat.SkillProcRate
+	newStats.Recovery += stat.Recovery
+	newStats.SkillDamageModifier += stat.SkillDamageModifier
+	return newStats
+}

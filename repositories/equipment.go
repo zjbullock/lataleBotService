@@ -15,8 +15,8 @@ type equipment struct {
 
 type EquipmentRepository interface {
 	InsertDocument(id *string, data interface{}) (*string, error)
-	ReadDocument(id string) (equipment *models.EquipmentSheet, err error)
-	QueryDocuments(args *[]models.QueryArg) (equipment *models.EquipmentSheet, err error)
+	ReadDocument(id string) (equipment *models.OldEquipmentSheet, err error)
+	QueryDocuments(args *[]models.QueryArg) (equipment *models.OldEquipmentSheet, err error)
 	UpdateDocument(docId string) (*time.Time, error)
 	UpdateDocumentFields(docId, field string, data interface{}) (*time.Time, error)
 }
@@ -52,7 +52,7 @@ func (e *equipment) InsertDocument(id *string, data interface{}) (*string, error
 	}
 }
 
-func (e *equipment) ReadDocument(id string) (equipment *models.EquipmentSheet, err error) {
+func (e *equipment) ReadDocument(id string) (equipment *models.OldEquipmentSheet, err error) {
 	//err = e.ds.OpenConnection()
 	//if err != nil {
 	//	e.log.Errorf("error opening ds connection: %v", err)
@@ -65,7 +65,7 @@ func (e *equipment) ReadDocument(id string) (equipment *models.EquipmentSheet, e
 		e.log.Errorf("error reading equipment: %v with id: %s", err, id)
 		return nil, err
 	}
-	var equips models.EquipmentSheet
+	var equips models.OldEquipmentSheet
 	err = doc.DataTo(&equips)
 	if err != nil {
 		e.log.Errorf("error converting doc: %v", err)
@@ -75,7 +75,7 @@ func (e *equipment) ReadDocument(id string) (equipment *models.EquipmentSheet, e
 	return &equips, nil
 }
 
-func (e *equipment) QueryDocuments(args *[]models.QueryArg) (equipment *models.EquipmentSheet, err error) {
+func (e *equipment) QueryDocuments(args *[]models.QueryArg) (equipment *models.OldEquipmentSheet, err error) {
 	//err = e.ds.OpenConnection()
 	//if err != nil {
 	//	e.log.Errorf("failed to open datasource connection")
@@ -87,7 +87,7 @@ func (e *equipment) QueryDocuments(args *[]models.QueryArg) (equipment *models.E
 		e.log.Errorf("error querying for documents with error: %v", err)
 		return nil, err
 	}
-	equipment = &models.EquipmentSheet{}
+	equipment = &models.OldEquipmentSheet{}
 	for _, doc := range docs {
 		err := doc.DataTo(&equipment)
 		if err != nil {

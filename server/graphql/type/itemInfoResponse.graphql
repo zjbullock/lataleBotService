@@ -1,0 +1,4 @@
+type ItemInfoResponse {
+    Item: ItemInfo,
+    Message: String
+}
