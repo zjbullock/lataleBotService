@@ -24,6 +24,7 @@ type Adventure interface {
 	LeaveParty(id string) (*string, error)
 	EquipItem(id, item string) (*string, error)
 	BuyItem(id, item string) (*string, error)
+	SellItem(id, item string) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
 	ClassAdvance(id, weapon, class string, givenClass *string) (*string, error)
 	GetJobList() (*[]models.JobClass, error)
@@ -1538,14 +1539,23 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 			Op:    "==",
 			Value: item,
 		},
+		{
+			Path:  "shop",
+			Op:    "==",
+			Value: true,
+		},
 	})
 	if err != nil {
 		a.log.Errorf("error getting item info: %v", err)
 		message := "There was a problem finding an item with that name."
 		return &message, nil
 	}
+	if itemData == nil {
+		message := fmt.Sprintf("Sorry, that item was unable to be found in the shop...")
+		return &message, nil
+	}
 	if *user.Ely-int64(*itemData.Cost) < 0 {
-		message := fmt.Sprintf("You do not have enough funds to complete the purchase of the %s")
+		message := fmt.Sprintf("You do not have enough funds to complete the purchase of the %s", itemData.Name)
 		return &message, nil
 	}
 	if user.Inventory.Equipment == nil {
@@ -1564,6 +1574,55 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 		return &message, nil
 	}
 	message := fmt.Sprintf("Successfully purchased the %s and added it to your inventory!", item)
+	return &message, nil
+}
+
+func (a *adventure) SellItem(id, item string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not yet selected a class, or created an account"
+		return &message, nil
+	}
+	itemData, err := a.item.QueryForDocument(&[]models.QueryArg{
+		{
+			Path:  "name",
+			Op:    "==",
+			Value: item,
+		},
+	})
+	if err != nil {
+		a.log.Errorf("error getting item info: %v", err)
+		message := "There was a problem finding an item with that name."
+		return &message, nil
+	}
+	if itemData == nil {
+		message := fmt.Sprintf("Sorry, that item was unable to be found in your bag.  Please use the item's name with proper captilization.")
+		return &message, nil
+	}
+	if user.Inventory.Equipment == nil {
+		user.Inventory.Equipment = make(map[string]int)
+		user.Inventory.Event = make(map[string]int)
+		user.Inventory.Consume = make(map[string]int)
+	}
+	if user.Inventory.Equipment != nil && user.Inventory.Equipment[itemData.Name] > 0 {
+		ely := *user.Ely
+		ely += int64(*itemData.Cost / 2)
+		user.Inventory.Equipment[itemData.Name]--
+		if user.Inventory.Equipment[itemData.Name] == 0 {
+			delete(user.Inventory.Equipment, itemData.Name)
+		}
+		user.Ely = &ely
+		_, err := a.users.UpdateDocument(user.ID, user)
+		if err != nil {
+			a.log.Errorf("error selling updating useer: %v", err)
+			message := fmt.Sprintf("There was a problem selling your item...")
+			return &message, nil
+		}
+		message := fmt.Sprintf("Successfully sold the ***%s*** for ***%v*** ely!", itemData.Name, *itemData.Cost/2)
+		return &message, nil
+	}
+	message := fmt.Sprintf("There does not appear to be an item with that name in your inventory!")
 	return &message, nil
 }
 
