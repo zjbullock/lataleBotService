@@ -665,6 +665,8 @@ func (a *adventure) ClassChange(id, class string, weapon *string) (*string, erro
 					return message, nil
 				}
 			}
+			message := fmt.Sprintf("You do not meet one or more requirements to change to this job.  Ensure you have the proper level on the required class.")
+			return &message, nil
 		}
 	}
 	message := "Please provide a weapon, as this is your first time creating this class."
