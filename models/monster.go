@@ -10,9 +10,10 @@ type Monster struct {
 	Stats      StatModifier  `json:"stats" firestore:"stats"`
 	BossBonus  *BossBonus    `json:"bossBonus" firestore:"bossBonus"`
 	Skills     *[]*BossSkill `json:"skills,omitempty" firestore:"skills,omitempty"`
-	IdleTime   *float64      `json:"idleTime" firestore:"idleTime"`
+	IdleTime   *float64      `json:"idleTime" firestore:"idleTime,omitempty"`
 	Phases     *[]string     `json:"phases" firestore:"phases,omitempty"`
 	IdlePhrase *string       `json:"idlePhrase" firestore:"idlePhrase,omitempty"`
+	DropRange  *LevelRange   `json:"dropRange,omitempty" firestore:"dropRange,omitempty"`
 }
 
 type BossSkill struct {

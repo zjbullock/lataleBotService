@@ -5,6 +5,7 @@ type Area struct {
 	ID         string     `json:"id" firestore:"id"`
 	LevelRange LevelRange `json:"levelRange" firestore:"levelRange"`
 	Monsters   []Monster  `json:"monsters" firestore:"monsters"`
+	DropRange  LevelRange `json:"dropRange" firestore:"dropRange"`
 }
 
 type LevelRange struct {
