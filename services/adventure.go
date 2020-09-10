@@ -1447,7 +1447,7 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		message := fmt.Sprintf("Unable to get class info for %s", user.Name)
 		return nil, &message, err
 	}
-	adventureLog, err := a.createAdventureLog(*classInfo, user, *currentStats, monster)
+	adventureLog, err := a.createAdventureLog(*classInfo, user, *currentStats, monster, area.DropRange)
 	if err != nil {
 		a.log.Errorf("encountered error generating adventure log: %v", err)
 		return &adventureLog, nil, err
@@ -1473,7 +1473,7 @@ func (a *adventure) createPartyAdventureLog(user *models.User, area *models.Area
 		a.log.Errorf("error generating monster blob: %v", err)
 		return nil, err
 	}
-	adventureLog, err = a.partyBattleLog(partyMemberInfos, encounteredMonsters, adventureLog, user)
+	adventureLog, err = a.partyBattleLog(partyMemberInfos, encounteredMonsters, adventureLog, user, area.DropRange)
 	if err != nil {
 		a.log.Errorf("error creating adventurelog: %v", err)
 		return nil, err
@@ -1526,6 +1526,7 @@ func (a *adventure) GetUserInventory(id string) (*models.Inventory, *string, err
 	}
 	return &user.Inventory, nil, nil
 }
+
 func (a *adventure) BuyItem(id, item string) (*string, error) {
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
@@ -2072,7 +2073,11 @@ bossBattle:
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
 			}
 			userInfo.LastBossActionTime = time.Now()
-
+			item := a.getRandomItemDrop(userInfo.Name, *boss.DropRange, *randGenerator)
+			if item != nil {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+				userInfo.Inventory.Equipment[item.Name]++
+			}
 			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
 			if err != nil {
 				a.log.Errorf("failed to update winningUsers doc with error: %v", err)
@@ -2112,7 +2117,66 @@ func (a *adventure) checkPhaseStatus(bossPercent float64, boss *models.Monster, 
 	return "", phaseCount
 }
 
-func (a *adventure) partyBattleLog(users []*models.UserBlob, encounteredMonsters []*models.MonsterBlob, adventureLog []string, primaryUser *models.User) ([]string, error) {
+func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand) *models.Item {
+	dropChance := rand.Float64()
+	if dropChance <= 0.10 {
+		items, err := a.item.QueryDocuments(&[]models.QueryArg{
+			{
+				Path:  "levelRequirement",
+				Op:    "<=",
+				Value: dropRange.Max,
+			},
+			{
+				Path:  "levelRequirement",
+				Op:    ">=",
+				Value: dropRange.Min,
+			},
+			{
+				Path:  "type.weaponType",
+				Op:    "==",
+				Value: currentWeapon,
+			},
+		})
+		if err != nil {
+			panic("failed to get items for drops")
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		item := rand.Intn(len(items))
+		return &items[item]
+	}
+	if dropChance <= 0.35 {
+		items, err := a.item.QueryDocuments(&[]models.QueryArg{
+			{
+				Path:  "levelRequirement",
+				Op:    "<=",
+				Value: dropRange.Max,
+			},
+			{
+				Path:  "levelRequirement",
+				Op:    ">=",
+				Value: dropRange.Min,
+			},
+			{
+				Path:  "type.type",
+				Op:    "==",
+				Value: "armor",
+			},
+		})
+		if len(items) == 0 {
+			return nil
+		}
+		if err != nil {
+			panic("failed to get items for drops")
+		}
+		item := rand.Intn(len(items))
+		return &items[item]
+	}
+	return nil
+}
+
+func (a *adventure) partyBattleLog(users []*models.UserBlob, encounteredMonsters []*models.MonsterBlob, adventureLog []string, primaryUser *models.User, dropRange models.LevelRange) ([]string, error) {
 	battleWin := false
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGenerator := rand.New(randSource)
@@ -2268,6 +2332,11 @@ combat:
 			if primaryUser.ID == userInfo.ID {
 				userInfo.LastActionTime = time.Now()
 			}
+			item := a.getRandomItemDrop(user.Weapon, dropRange, *randGenerator)
+			if item != nil {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+				userInfo.Inventory.Equipment[item.Name]++
+			}
 			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
 			if err != nil {
 				a.log.Errorf("failed to update user doc with error: %v", err)
@@ -2304,7 +2373,7 @@ func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonste
 	return true
 }
 
-func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster) ([]string, error) {
+func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster, dropRange models.LevelRange) ([]string, error) {
 	var adventureLog []string
 	logLine, onCooldown := a.checkAdventureCooldown(user, false)
 	if onCooldown {
@@ -2398,7 +2467,11 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
 		}
-
+		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator)
+		if item != nil {
+			newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+			user.Inventory.Equipment[item.Name]++
+		}
 		user.ClassMap[user.CurrentClass] = &newUserClassInfo
 		adventureLog = newAdventureLog
 	} else if battleWin && levelCap.Value == user.ClassMap[user.CurrentClass].Level {
@@ -2415,6 +2488,11 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		user.ClassMap[user.CurrentClass] = &userClassInfo
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
+		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator)
+		if item != nil {
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+			user.Inventory.Equipment[item.Name]++
+		}
 	} else {
 		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", user.Name))
 	}
