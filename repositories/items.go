@@ -76,7 +76,7 @@ func (i *item) QueryDocuments(args *[]models.QueryArg) ([]models.Item, error) {
 		item := models.Item{}
 		err := doc.DataTo(&item)
 		if err != nil {
-			i.log.Errorf("error converting doc to area with error: %v", err)
+			i.log.Errorf("error converting doc to item with error: %v", err)
 			return nil, err
 		}
 		items = append(items, item)

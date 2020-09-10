@@ -2075,7 +2075,7 @@ bossBattle:
 			userInfo.LastBossActionTime = time.Now()
 			item := a.getRandomItemDrop(userInfo.Name, *boss.DropRange, *randGenerator)
 			if item != nil {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 				userInfo.Inventory.Equipment[item.Name]++
 			}
 			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
@@ -2334,7 +2334,7 @@ combat:
 			}
 			item := a.getRandomItemDrop(user.Weapon, dropRange, *randGenerator)
 			if item != nil {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 				userInfo.Inventory.Equipment[item.Name]++
 			}
 			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
@@ -2469,7 +2469,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		}
 		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator)
 		if item != nil {
-			newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+			newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 			user.Inventory.Equipment[item.Name]++
 		}
 		user.ClassMap[user.CurrentClass] = &newUserClassInfo
@@ -2490,7 +2490,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
 		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator)
 		if item != nil {
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, item.LevelRequirement, *item.Type.WeaponType))
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 			user.Inventory.Equipment[item.Name]++
 		}
 	} else {
