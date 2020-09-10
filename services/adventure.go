@@ -2159,7 +2159,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 				Value: dropRange.Min,
 			},
 			{
-				Path:  "type.type",
+				Path:  "type.itemType",
 				Op:    "==",
 				Value: "armor",
 			},
