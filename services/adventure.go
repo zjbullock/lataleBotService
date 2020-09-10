@@ -2146,7 +2146,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 		item := rand.Intn(len(items))
 		return &items[item]
 	}
-	if dropChance <= 0.35 {
+	if dropChance <= 0.50 {
 		items, err := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "levelRequirement",
