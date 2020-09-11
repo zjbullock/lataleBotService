@@ -1653,7 +1653,7 @@ func (a *adventure) EquipItem(id, item string) (*string, error) {
 	}
 	equipment := items[0]
 	if equipment.Type.Type != "weapon" && equipment.Type.Type != "armor" {
-		message := fmt.Sprintf("That is a not a valid piece of equipment!")
+		message := fmt.Sprintf("That is a not a valid piece of equipment!  Ensure spelling and capitalization is correct.")
 		return &message, err
 	}
 	if user.ClassMap[user.CurrentClass].Level < int64(*equipment.LevelRequirement) {
