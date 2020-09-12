@@ -2075,7 +2075,7 @@ bossBattle:
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
 			}
 			userInfo.LastBossActionTime = time.Now()
-			item := a.getRandomItemDrop(userInfo.Name, *boss.DropRange, *randGenerator)
+			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.DropRange, *randGenerator)
 			if item != nil {
 				if userInfo.Inventory.Equipment == nil {
 					userInfo.Inventory.Equipment = make(map[string]int)
