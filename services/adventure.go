@@ -2126,7 +2126,7 @@ func (a *adventure) checkPhaseStatus(bossPercent float64, boss *models.Monster, 
 
 func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand) *models.Item {
 	dropChance := rand.Float64()
-	if dropChance <= 0.10 {
+	if dropChance <= 0.20 {
 		items, err := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "levelRequirement",
