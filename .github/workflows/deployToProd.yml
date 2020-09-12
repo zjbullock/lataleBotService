@@ -26,15 +26,6 @@ jobs:
     - name: Build
       run: go build -v .
  
-#     - name: Create Credentials File
-#       uses: finnp/create-file-action@1.0.0
-#       env:
-#         # file
-#         FILE_NAME: "credentials.json"
-#         # creds
-#         FILE_DATA: ${{ secrets.FIREBASE_CREDENTIALS_PROD }}  
-
-
     - name: Create Config File
       uses: finnp/create-file-action@1.0.0
       env:
