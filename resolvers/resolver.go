@@ -127,7 +127,7 @@ func (r *Resolver) BuyItem(ctx context.Context, args struct{ Id, Name string }) 
 }
 
 func (r *Resolver) SellItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
-	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), nil)
+	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), nil, 1)
 	if err != nil {
 		r.Log.Errorf("error selling specified item")
 		return nil, err
@@ -147,12 +147,10 @@ func (r *Resolver) SellAllItems(ctx context.Context, args struct{ Id string }) (
 	}
 	if inventory != nil {
 		for equip, count := range inventory.Equipment {
-			for i := 0; i < count; i++ {
-				_, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(equip), user)
-				if err != nil {
-					r.Log.Errorf("error equipping specified item")
-					return nil, err
-				}
+			_, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(equip), user, count)
+			if err != nil {
+				r.Log.Errorf("error equipping specified item")
+				return nil, err
 			}
 		}
 	}

@@ -25,7 +25,7 @@ type Adventure interface {
 	LeaveParty(id string) (*string, error)
 	EquipItem(id, item string) (*string, error)
 	BuyItem(id, item string) (*string, error)
-	SellItem(id, item string, user *models.User) (*string, error)
+	SellItem(id, item string, user *models.User, quantity int) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
 	ClassAdvance(id, weapon, class string, givenClass *string) (*string, error)
 	GetJobList() (*[]models.JobClass, error)
@@ -1587,7 +1587,7 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 	return &message, nil
 }
 
-func (a *adventure) SellItem(id, item string, user *models.User) (*string, error) {
+func (a *adventure) SellItem(id, item string, user *models.User, quantity int) (*string, error) {
 	if user == nil {
 		newUser, err := a.users.ReadDocument(id)
 		if err != nil {
@@ -1612,16 +1612,18 @@ func (a *adventure) SellItem(id, item string, user *models.User) (*string, error
 		user.Inventory.Consume = make(map[string]int)
 	}
 	if user.Inventory.Equipment != nil && user.Inventory.Equipment[itemData.Name] > 0 {
-		ely := *user.Ely
-		ely += int64(*itemData.Cost / 2)
-		user.Inventory.Equipment[itemData.Name]--
-		if user.Inventory.Equipment[itemData.Name] == 0 {
-			delete(user.Inventory.Equipment, itemData.Name)
+		for i := 0; i < quantity; i++ {
+			ely := *user.Ely
+			ely += int64(*itemData.Cost / 2)
+			user.Inventory.Equipment[itemData.Name]--
+			if user.Inventory.Equipment[itemData.Name] == 0 {
+				delete(user.Inventory.Equipment, itemData.Name)
+			}
+			user.Ely = &ely
 		}
-		user.Ely = &ely
 		_, err := a.users.UpdateDocument(user.ID, user)
 		if err != nil {
-			a.log.Errorf("error selling updating useer: %v", err)
+			a.log.Errorf("error selling updating user: %v", err)
 			message := fmt.Sprintf("There was a problem selling your item...")
 			return &message, nil
 		}
@@ -2469,14 +2471,11 @@ bossBattle:
 			} else if battleWin && levelCap.Value == winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
 				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
-				bossExp := int64(float64(boss.Exp*float64(*expGainRate)) * partyBonus)
-				userClassInfo.Exp += bossExp
 				oldEly := *winningUsers.User.Ely
 				bossEly := int64(float64(boss.Ely*float64(*expGainRate)) * partyBonus)
 				oldEly += bossEly
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", winningUsers.User.Name, utils.String(bossExp), bossEly))
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
 			}
 			userInfo.LastBossActionTime = time.Now()
@@ -2727,14 +2726,10 @@ combat:
 				adventureLog = newAdventureLog
 			} else if battleWin && levelCap.Value == user.User.ClassMap[user.User.CurrentClass].Level {
 				userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
-				monsterExp := totalExpReward / int64(len(users)) * int64(*expGainRate)
-				userClassInfo.Exp += monsterExp
-				monsterEly := totalElyReward / int64(len(users)) * int64(*expGainRate)
 				oldEly := *user.User.Ely
 				oldEly += totalElyReward / int64(len(users)) * int64(*expGainRate)
 				userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 				userInfo.Ely = &oldEly
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.User.Name, utils.String(monsterExp), monsterEly))
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.User.Name, levelCap.Value))
 			}
 			if primaryUser.ID == userInfo.ID {
@@ -2990,12 +2985,9 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		if err != nil {
 			return nil, err
 		}
-		monsterExp := int64(monster.Exp * float64(*expGainRate))
-		userClassInfo.Exp += monsterExp
 		monsterEly := int64(monster.Ely * float64(*expGainRate))
 		*user.Ely += monsterEly
 		user.ClassMap[user.CurrentClass] = &userClassInfo
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
 		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil)
 		if item != nil {
