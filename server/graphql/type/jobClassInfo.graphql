@@ -2,5 +2,11 @@ type JobClassInfo {
     Description: String
     LevelRequirement: Float
     ClassRequirement: String
+    Trait: TraitDescription
     Name: String
+}
+
+type TraitDescription {
+    Name: String!
+    Description: String!
 }

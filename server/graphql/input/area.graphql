@@ -3,4 +3,5 @@ input Area {
     ID: String!
     LevelRange: LevelRange!
     Monsters: [Monster!]!
+    DropRange: LevelRange!
 }

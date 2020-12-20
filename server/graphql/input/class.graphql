@@ -6,4 +6,5 @@ input Class {
     LevelRequirement: Int!
     Weapons: [Weapon!]!
     Stats: Stat!
+    Trait: Trait
 }

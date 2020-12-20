@@ -33,3 +33,10 @@ func (j *jobClassResolver) Stats(_ context.Context) *models.StatModifier {
 func (j *jobClassResolver) Description(_ context.Context) *string {
 	return &j.jobClass.Description
 }
+
+func (j *jobClassResolver) Trait(_ context.Context) *traitResolver {
+	if j.jobClass.Trait == nil {
+		return nil
+	}
+	return &traitResolver{trait: *j.jobClass.Trait}
+}

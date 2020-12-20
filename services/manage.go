@@ -201,7 +201,7 @@ func (m *manage) IncreaseLevelCap(level int) (*[]models.Level, error) {
 	}
 	var addedLevels []models.Level
 	for _, level := range levels {
-		stringLevel := utils.String(level.Value)
+		stringLevel := utils.ThirtyTwoBitIntToString(level.Value)
 		m.log.Debugf("level.Val: %s", stringLevel)
 		if currentLevels[stringLevel] == nil {
 			insertedLevel, err := m.levels.InsertDocument(&stringLevel, level)
@@ -228,7 +228,7 @@ func (m *manage) CreateExpTable(levels []models.Level) (*[]models.Level, error) 
 	}
 	var addedLevels []models.Level
 	for _, level := range levels {
-		stringLevel := utils.String(level.Value)
+		stringLevel := utils.ThirtyTwoBitIntToString(level.Value)
 		m.log.Debugf("level.Val: %s", stringLevel)
 		if currentLevels[stringLevel] == nil {
 			insertedLevel, err := m.levels.InsertDocument(&stringLevel, level)
@@ -262,6 +262,16 @@ func (m *manage) AddNewArea(area models.Area) (*string, error) {
 	}
 	return id, nil
 }
+
+//func (m *manage) BatchBossItems() (*string, error) {
+//	items, err := m.item.QueryDocuments(&[]models.QueryArg{})
+//	if err != nil {
+//		m.log.Errorf("error getting items: %v", err)
+//		return nil, err
+//	}
+//
+//	m.item.UpdateDocument()
+//}
 
 func (m *manage) AddNewMonster(area *models.Area, monster models.Monster) (*string, error) {
 	area.Monsters = append(area.Monsters, monster)
@@ -337,7 +347,7 @@ func (m *manage) calculateExpTable(level int) []models.Level {
 		if i == 1 {
 			levels = append(levels, models.Level{Value: 1, Exp: 0})
 		} else {
-			levels = append(levels, models.Level{Value: int64(i), Exp: int64(m.calculateExpForLevel(i))})
+			levels = append(levels, models.Level{Value: int32(i), Exp: int64(m.calculateExpForLevel(i))})
 		}
 	}
 	return levels

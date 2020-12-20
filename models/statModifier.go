@@ -14,18 +14,60 @@ type StatModifier struct {
 	SkillDamageModifier    float64 `json:"skillDamageModifier" firestore:"skillDamageModifier"`
 }
 
-func (s StatModifier) AddStatModifier(stat StatModifier) StatModifier {
-	newStats := s
-	newStats.CriticalRate += stat.CriticalRate
-	newStats.MaxDPS += stat.MaxDPS
-	newStats.MinDPS += stat.MinDPS
-	newStats.CriticalDamageModifier += stat.CriticalDamageModifier
-	newStats.Defense += stat.Defense
-	newStats.Accuracy += stat.Accuracy
-	newStats.Evasion += stat.Evasion
-	newStats.HP += stat.HP
-	newStats.SkillProcRate += stat.SkillProcRate
-	newStats.Recovery += stat.Recovery
-	newStats.SkillDamageModifier += stat.SkillDamageModifier
-	return newStats
+func (s *StatModifier) AddBuffStats(buffModifiers StatModifier) StatModifier {
+	return StatModifier{
+		MaxDPS:                 buffModifiers.MaxDPS * s.MaxDPS,
+		MinDPS:                 buffModifiers.MinDPS * s.MinDPS,
+		Defense:                buffModifiers.Defense * s.Defense,
+		HP:                     buffModifiers.HP * s.HP,
+		CriticalDamageModifier: buffModifiers.CriticalDamageModifier * s.CriticalDamageModifier,
+		CriticalRate:           buffModifiers.CriticalRate,
+		Accuracy:               buffModifiers.Accuracy,
+		Evasion:                buffModifiers.Evasion,
+		SkillDamageModifier:    buffModifiers.SkillDamageModifier,
+		SkillProcRate:          buffModifiers.SkillProcRate,
+		Recovery:               buffModifiers.Recovery,
+	}
+}
+
+func (s *StatModifier) AddStatModifier(stat StatModifier) {
+	s.CriticalRate += stat.CriticalRate
+	s.MaxDPS += stat.MaxDPS
+	s.MinDPS += stat.MinDPS
+	s.Defense += stat.Defense
+	s.HP += stat.HP
+	s.CriticalDamageModifier += stat.CriticalDamageModifier
+	s.Accuracy += stat.Accuracy
+	s.Evasion += stat.Evasion
+	s.SkillProcRate += stat.SkillProcRate
+	s.Recovery += stat.Recovery
+	s.SkillDamageModifier += stat.SkillDamageModifier
+}
+
+func (s *StatModifier) AmplifyStatModifier(stat StatModifier) {
+	s.CriticalRate *= stat.CriticalRate
+	s.MaxDPS *= stat.MaxDPS
+	s.MinDPS *= stat.MinDPS
+	s.Defense *= stat.Defense
+	s.HP *= stat.HP
+	s.CriticalDamageModifier *= stat.CriticalDamageModifier
+	s.Accuracy *= stat.Accuracy
+	s.Evasion *= stat.Evasion
+	s.SkillProcRate *= stat.SkillProcRate
+	s.Recovery *= stat.Recovery
+	s.SkillDamageModifier *= stat.SkillDamageModifier
+}
+
+func (s *StatModifier) SubtractStatModifier(stat StatModifier) {
+	s.CriticalRate -= stat.CriticalRate
+	s.MaxDPS -= stat.MaxDPS
+	s.MinDPS -= stat.MinDPS
+	s.CriticalDamageModifier -= stat.CriticalDamageModifier
+	s.Defense -= stat.Defense
+	s.Accuracy -= stat.Accuracy
+	s.Evasion -= stat.Evasion
+	s.HP -= stat.HP
+	s.SkillProcRate -= stat.SkillProcRate
+	s.Recovery -= stat.Recovery
+	s.SkillDamageModifier -= stat.SkillDamageModifier
 }

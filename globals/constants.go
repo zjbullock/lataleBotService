@@ -13,3 +13,14 @@ const (
 	EQUIPMENT = "equipment"
 	BOSSES    = "bosses"
 )
+
+type TraitType string
+
+const (
+	REACTIVETRAIT    TraitType = "REACTIVETRAIT"
+	GUARDTRAIT       TraitType = "GUARDTRAIT"
+	HPPERCENTTRAIT   TraitType = "HPPERCENTTRAIT"
+	DEATHTRAIT       TraitType = "DEATHTRAIT"
+	ATTACKTRAIT      TraitType = "ATTACKTRAIT"
+	BATTLESTARTTRAIT TraitType = "BATTLESTARTTRAIT"
+)

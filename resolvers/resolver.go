@@ -120,19 +120,44 @@ func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }
 func (r *Resolver) BuyItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
 	message, err := r.Services.Adventure.BuyItem(args.Id, strings.TrimSpace(args.Name))
 	if err != nil {
-		r.Log.Errorf("error equipping specified item")
+		r.Log.Errorf("error buying specified item")
 		return nil, err
 	}
 	return message, err
 }
 
 func (r *Resolver) SellItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
-	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name))
+	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), nil)
 	if err != nil {
-		r.Log.Errorf("error equipping specified item")
+		r.Log.Errorf("error selling specified item")
 		return nil, err
 	}
 	return message, err
+}
+
+func (r *Resolver) SellAllItems(ctx context.Context, args struct{ Id string }) (*string, error) {
+	user, message, err := r.Services.Adventure.GetUserInfo(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting user info")
+		return message, err
+	}
+	inventory, _, err := r.Services.Adventure.GetUserInventory(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting user inventory")
+	}
+	if inventory != nil {
+		for equip, count := range inventory.Equipment {
+			for i := 0; i < count; i++ {
+				_, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(equip), user)
+				if err != nil {
+					r.Log.Errorf("error equipping specified item")
+					return nil, err
+				}
+			}
+		}
+	}
+	finishedSelling := "You've sold all items in your inventory!"
+	return &finishedSelling, nil
 }
 
 func (r *Resolver) GetUserInventory(ctx context.Context, args struct{ Id string }) (*inventoryResponseResolver, error) {
