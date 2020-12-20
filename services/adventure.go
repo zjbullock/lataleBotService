@@ -891,12 +891,12 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips *models.Equi
 	if err != nil {
 		panic("error getting boots!")
 	}
-	var bindi *models.Item
-	var glasses *models.Item
-	var earring *models.Item
-	var ring *models.Item
-	var mantle *models.Item
-	var stocking *models.Item
+	var bindi = currentEquips.Bindi
+	var glasses = currentEquips.Glasses
+	var earring = currentEquips.Earring
+	var ring = currentEquips.Ring
+	var mantle = currentEquips.Cloak
+	var stocking = currentEquips.Stockings
 
 	if currentEquips.Bindi == nil {
 		bindi, err = a.item.QueryForDocument(&[]models.QueryArg{
