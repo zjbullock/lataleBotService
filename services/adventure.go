@@ -1606,6 +1606,10 @@ func (a *adventure) SellItem(id, item string, user *models.User, quantity int) (
 		message := fmt.Sprintf("Sorry, that item was unable to be found in your bag.  Please use the item's name with proper captilization.")
 		return &message, nil
 	}
+	if itemData.Boss != nil && user != nil {
+		message := fmt.Sprintf("Skipping this item in sellAll as it is a boss item.")
+		return &message, nil
+	}
 	if user.Inventory.Equipment == nil {
 		user.Inventory.Equipment = make(map[string]int)
 		user.Inventory.Event = make(map[string]int)
