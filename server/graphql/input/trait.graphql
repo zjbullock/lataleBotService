@@ -1,0 +1,26 @@
+input Trait {
+    Name: String!
+    Description: String!
+    Type: String!
+    HPTrigger: Float
+    ActivationRate: Float
+    UsageCount: Int
+    CrowdControl: CrowdControlTrait
+    Battle: BattleTrait
+}
+
+input CrowdControlTrait {
+    Type: String!
+    CrowdControlTime: Int!
+}
+
+input BattleTrait {
+    AoE: Boolean!
+    HitCounter: Int!
+    Buff: BuffTrait!
+}
+
+input BuffTrait {
+    StatModifier: Stat!
+    Duration: Int
+}

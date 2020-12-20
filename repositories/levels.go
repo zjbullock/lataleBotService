@@ -66,7 +66,6 @@ func (l *level) ReadDocument(id string) (level *models.Level, err error) {
 		l.log.Errorf("error reading level: %v", err)
 		return nil, err
 	}
-	l.log.Debugf("doc: %v", doc)
 	level = &models.Level{}
 	err = doc.DataTo(level)
 	if err != nil {
@@ -97,7 +96,7 @@ func (l *level) QueryDocuments(collection string, args *[]models.QueryArg) (map[
 				l.log.Errorf("error converting doc to profile with error: %v", err)
 				return nil, err
 			}
-			levels[utils.String(level.Value)] = &level
+			levels[utils.ThirtyTwoBitIntToString(level.Value)] = &level
 		}
 	}
 	return levels, nil

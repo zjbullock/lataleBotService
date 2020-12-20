@@ -3,6 +3,7 @@ input Item {
     Type: ItemType!
     LevelRequirement: Float
     Shop: Boolean!
+    Boss: String
     Description: String
     Cost: Int
     Stats: Stat

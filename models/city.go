@@ -1,7 +1,7 @@
 package models
 
 type City struct {
-	ID            int      `json:"id" firestore:"id"`
-	EquipmentShop []string `json:"weapons" firestore:"weapons"`
-	ConsumeShop   []string `json:"consumables" firestore:"consumables"`
+	ID         int        `json:"id" firestore:"id"`
+	Name       string     `json:"name" firestore:"name"`
+	LevelRange LevelRange `json:"levelRange" firestore:"levelRange"`
 }
