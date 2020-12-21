@@ -1587,15 +1587,12 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 	return &message, nil
 }
 
-func (a *adventure) SellItem(id, item string, user *models.User, quantity int) (*string, error) {
-	if user == nil {
-		newUser, err := a.users.ReadDocument(id)
-		if err != nil {
-			a.log.Errorf("error getting user info: %v", err)
-			message := "User has not yet selected a class, or created an account"
-			return &message, nil
-		}
-		user = newUser
+func (a *adventure) SellItem(id, item string, sellUser *models.User, quantity int) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not yet selected a class, or created an account"
+		return &message, nil
 	}
 	itemData, message, err := a.GetItemInfo(item)
 	if err != nil {
@@ -1606,7 +1603,7 @@ func (a *adventure) SellItem(id, item string, user *models.User, quantity int) (
 		message := fmt.Sprintf("Sorry, that item was unable to be found in your bag.  Please use the item's name with proper captilization.")
 		return &message, nil
 	}
-	if (itemData.Boss != nil || int32(*itemData.LevelRequirement) >= user.ClassMap[user.CurrentClass].Level) && user != nil {
+	if (itemData.Boss != nil || int32(*itemData.LevelRequirement) >= user.ClassMap[user.CurrentClass].Level) && sellUser != nil {
 		message := fmt.Sprintf("Skipping this item in sellAll as it is a boss item.")
 		return &message, nil
 	}
