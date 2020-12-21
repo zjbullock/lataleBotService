@@ -226,7 +226,7 @@ func (r *Resolver) AddNewItem(ctx context.Context, args struct{ Item models.Item
 }
 
 func (r *Resolver) GetItemInfo(ctx context.Context, args struct{ ItemName string }) (*itemResponseResolver, error) {
-	itemInfo, message, err := r.Services.Adventure.GetItemInfo(strings.Title(strings.ToLower(strings.TrimSpace(args.ItemName))))
+	itemInfo, message, err := r.Services.Adventure.GetItemInfo(strings.TrimSpace(args.ItemName))
 	if err != nil {
 		r.Log.Errorf("error retrieving info for the specified item: %v", err)
 		return nil, err
