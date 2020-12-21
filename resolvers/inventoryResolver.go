@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"lataleBotService/models"
+	"sort"
 )
 
 type inventoryResolver struct {
@@ -21,6 +22,9 @@ func (i *inventoryResolver) Equipment(_ context.Context) *[]*inventoryItemResolv
 	if len(equips) == 0 {
 		return nil
 	}
+	sort.Slice(equips, func(i, j int) bool {
+		return equips[j].basicItem.Name > equips[i].basicItem.Name
+	})
 	return &equips
 }
 
