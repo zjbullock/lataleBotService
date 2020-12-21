@@ -2374,7 +2374,7 @@ bossBattle:
 				if *user.CrowdControlStatus == "bleed" {
 					damageOvertime = int(float64(user.CurrentHP) * 0.10)
 				} else if *user.CrowdControlStatus == "poison" || *user.CrowdControlStatus == "burn" {
-					damageOvertime = int(float64(user.MaxHP) * 0.05)
+					damageOvertime = int(float64(user.MaxHP) * 0.075)
 				}
 				user.CurrentHP = ((user.CurrentHP - int(damageOvertime)) + int(math.Abs(float64(user.CurrentHP-damageOvertime)))) / 2
 				healLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", user.User.Name, damageOvertime, *user.CrowdControlStatus, user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
@@ -2390,11 +2390,11 @@ bossBattle:
 						skillUsage := *user.JobClass.Trait.UsageCount
 						skillUsage--
 						user.JobClass.Trait.UsageCount = &skillUsage
-						alivePlayers[i] = user
 					} else {
 						healLogs += fmt.Sprintf("**%s was killed by %s!**\n", user.User.Name, boss.Name)
 						playerDied = true
 					}
+					alivePlayers[i] = user
 				}
 			}
 		}
