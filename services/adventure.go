@@ -2390,11 +2390,11 @@ bossBattle:
 						skillUsage := *user.JobClass.Trait.UsageCount
 						skillUsage--
 						user.JobClass.Trait.UsageCount = &skillUsage
-						alivePlayers[i] = user
 					} else {
 						healLogs += fmt.Sprintf("**%s was killed by %s!**\n", user.User.Name, boss.Name)
 						playerDied = true
 					}
+					alivePlayers[i] = user
 				}
 			}
 		}
