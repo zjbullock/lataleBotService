@@ -1888,8 +1888,11 @@ func (a *adventure) checkPhaseStatus(bossPercent float64, boss *models.Monster, 
 	return "", phaseCount
 }
 
-func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand, boss *string) *models.Item {
+func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand, boss *string, partySize int) *models.Item {
 	dropChance := rand.Float64()
+	if partySize > 1 {
+		dropChance = dropChance - (0.05 * float64(partySize))
+	}
 	if boss != nil && dropChance <= 0.25 {
 		items, _ := a.item.QueryDocuments(&[]models.QueryArg{
 			{
@@ -2483,7 +2486,7 @@ bossBattle:
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
 			}
 			userInfo.LastBossActionTime = time.Now()
-			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.DropRange, *randGenerator, &boss.Name)
+			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.DropRange, *randGenerator, &boss.Name, len(users))
 			if item != nil {
 				if userInfo.Inventory.Equipment == nil {
 					userInfo.Inventory.Equipment = make(map[string]int)
@@ -2739,7 +2742,7 @@ combat:
 			if primaryUser.ID == userInfo.ID {
 				userInfo.LastActionTime = time.Now()
 			}
-			item := a.getRandomItemDrop(user.Weapon, dropRange, *randGenerator, nil)
+			item := a.getRandomItemDrop(user.Weapon, dropRange, *randGenerator, nil, len(users))
 			if item != nil {
 				if userInfo.Inventory.Equipment == nil {
 					userInfo.Inventory.Equipment = make(map[string]int)
@@ -2970,7 +2973,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
 		}
-		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil)
+		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1)
 		if item != nil {
 			if user.Inventory.Equipment == nil {
 				user.Inventory.Equipment = make(map[string]int)
@@ -2993,7 +2996,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		*user.Ely += monsterEly
 		user.ClassMap[user.CurrentClass] = &userClassInfo
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
-		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil)
+		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1)
 		if item != nil {
 			if user.Inventory.Equipment == nil {
 				user.Inventory.Equipment = make(map[string]int)
