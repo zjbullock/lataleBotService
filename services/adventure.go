@@ -1787,7 +1787,7 @@ func (a *adventure) checkAdventureCooldown(user *models.User, boss bool) (*strin
 	var lastAction time.Time
 	var commandType string
 	if boss {
-		lastAction = user.LastBossActionTime.Add(45 * time.Minute)
+		lastAction = user.LastBossActionTime.Add(20 * time.Minute)
 		commandType = "boss"
 	} else {
 		lastAction = user.LastActionTime.Add(2 * time.Minute)
