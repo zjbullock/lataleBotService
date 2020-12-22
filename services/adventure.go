@@ -1898,8 +1898,16 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 				Value: *boss,
 			},
 		})
+
 		if len(items) > 0 {
 			item := rand.Intn(len(items))
+			if dropChance <= 0.15 {
+				for i, equip := range items {
+					if *equip.Type.WeaponType == currentWeapon {
+						item = i
+					}
+				}
+			}
 			return &items[item]
 		}
 	}
