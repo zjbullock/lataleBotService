@@ -2373,8 +2373,13 @@ bossBattle:
 					userInfo.Inventory.Event = make(map[string]int)
 					userInfo.Inventory.Consume = make(map[string]int)
 				}
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
-				userInfo.Inventory.Equipment[item.Name]++
+				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 25 {
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+				} else {
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+					userInfo.Inventory.Equipment[item.Name]++
+				}
+
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
 			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
@@ -2629,8 +2634,12 @@ combat:
 					userInfo.Inventory.Event = make(map[string]int)
 					userInfo.Inventory.Consume = make(map[string]int)
 				}
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
-				userInfo.Inventory.Equipment[item.Name]++
+				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 25 {
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+				} else {
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+					userInfo.Inventory.Equipment[item.Name]++
+				}
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
 			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
@@ -2840,8 +2849,12 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 				user.Inventory.Event = make(map[string]int)
 				user.Inventory.Consume = make(map[string]int)
 			}
-			newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
-			user.Inventory.Equipment[item.Name]++
+			if user.Inventory.Equipment[item.Name] == 0 && len(user.Inventory.Equipment) >= 25 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+			} else {
+				newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+				user.Inventory.Equipment[item.Name]++
+			}
 		}
 		user.ClassMap[user.CurrentClass] = &newUserClassInfo
 		adventureLog = newAdventureLog
@@ -2863,8 +2876,12 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 				user.Inventory.Event = make(map[string]int)
 				user.Inventory.Consume = make(map[string]int)
 			}
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
-			user.Inventory.Equipment[item.Name]++
+			if user.Inventory.Equipment[item.Name] == 0 && len(user.Inventory.Equipment) >= 25 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+			} else {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+				user.Inventory.Equipment[item.Name]++
+			}
 		}
 	} else {
 		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", user.Name))
