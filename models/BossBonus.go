@@ -15,4 +15,5 @@ type BossBonus struct {
 	SkillProcRate          float64  `json:"skillProcRate" firestore:"skillProcRate"`
 	SkillDamageModifier    float64  `json:"skillDamageModifier" firestore:"skillDamageModifier"`
 	Recovery               float64  `json:"recovery" firestore:"recovery"`
+	TargetDefenseDecrease  float64  `json:"targetDefenseDecrease" firestore:"targetDefenseDecrease"`
 }

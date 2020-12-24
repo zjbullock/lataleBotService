@@ -2001,6 +2001,10 @@ func (a *adventure) determineBuffs(users []*models.UserBlob, adventureLog []stri
 							StatModifier: diffStats,
 							Duration:     user.JobClass.Trait.Battle.Buff.Duration,
 						}
+						if buffedUsers[j].MaxHP < int(buffedUsers[j].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
+							buffedUsers[j].MaxHP = int(buffedUsers[j].BattleStats.HP)
+							buffedUsers[j].CurrentHP = buffedUsers[j].MaxHP
+						}
 					}
 				}
 			} else {
@@ -2011,6 +2015,10 @@ func (a *adventure) determineBuffs(users []*models.UserBlob, adventureLog []stri
 					buffedUsers[i].User.Buffs[user.JobClass.Trait.Name] = &models.Buff{
 						StatModifier: diffStats,
 						Duration:     user.JobClass.Trait.Battle.Buff.Duration,
+					}
+					if buffedUsers[i].MaxHP < int(buffedUsers[i].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
+						buffedUsers[i].MaxHP = int(buffedUsers[i].BattleStats.HP)
+						buffedUsers[i].CurrentHP = buffedUsers[i].MaxHP
 					}
 				}
 
@@ -2052,129 +2060,11 @@ func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster
 	}
 	bossHPPercentage := float64(bossCurrentHp) / float64(bossMaxHp)
 	var adventureLog []string
-	//Set cooldowns of all boss skills to 0 for beginning.
 	for _, skill := range *boss.Skills {
 		curCd := int32(0)
 		skill.CurrentCoolDown = &curCd
 	}
 
-	//users[0].JobClass.Trait = &models.Trait{
-	//	Name:        "Berserker Drive",
-	//	Description: "Being pushed past your limits has awakened a rage within you!",
-	//	Type:        globals.REACTIVETRAIT,
-	//	HPTrigger: func() *float64 {
-	//		trigger := 0.5
-	//		return &trigger
-	//	}(),
-	//	Battle: &models.BattleTrait{
-	//		AoE:        false,
-	//		HitCounter: 1,
-	//		Buff: models.Buff{
-	//			StatModifier: models.StatModifier{
-	//				CriticalRate:           0.25,
-	//				CriticalDamageModifier: 0.5,
-	//				HP:                     -0.4,
-	//				MaxDPS:                 0.25,
-	//			},
-	//			Duration: func() *int32 {
-	//				duration := int32(5)
-	//				return &duration
-	//			}(),
-	//		},
-	//	},
-	//}
-	//users[0].JobClass.Trait = &models.Trait{
-	//	Name:        "Mech Recall",
-	//	Description: "Your mech was destroyed, but you called another one!",
-	//	Type:        globals.DEATHTRAIT,
-	//	UsageCount: func() *int32 {
-	//		i := int32(1)
-	//		return &i
-	//	}(),
-	//	Battle: &models.BattleTrait{
-	//		Buff: models.Buff{
-	//			StatModifier: models.StatModifier{
-	//				HP: 1.0,
-	//			},
-	//		},
-	//	},
-	//}
-	//users[0].JobClass.Trait = &models.Trait{
-	//	Name:        "Perfect Guard",
-	//	Description: "You deftly guard against incoming damage!",
-	//	Type:        globals.GUARDTRAIT,
-	//	ActivationRate: func() *float64 {
-	//		i := float64(0.25)
-	//		return &i
-	//	}(),
-	//}
-	//users[1].JobClass.Trait = &models.Trait{
-	//	Name:        "Power of Music",
-	//	Description: "Buff yourself and your party with the power of music!",
-	//	Type:        globals.BATTLESTARTTRAIT,
-	//	Battle: &models.BattleTrait{
-	//		AoE: true,
-	//		Buff: models.Buff{
-	//			StatModifier: models.StatModifier{
-	//				CriticalDamageModifier: 0.5,
-	//				MaxDPS:                 0.5,
-	//				MinDPS:                 0.25,
-	//				CriticalRate:           0.0,
-	//				Defense:                0.10,
-	//				Accuracy:               0.0,
-	//				Evasion:                0.0,
-	//				HP:                     0.0,
-	//				SkillProcRate:          0.0,
-	//				Recovery:               0.30,
-	//				SkillDamageModifier:    0.0,
-	//			},
-	//			Duration: func() *int32 {
-	//				duration := int32(5)
-	//				return &duration
-	//			}(),
-	//		},
-	//	},
-	//}
-	//users[0].JobClass.Trait = &models.Trait{
-	//	Name:        "Power Concentration",
-	//	Description: "Feeling well rested, you're in peak performance at the beginning of the fight!",
-	//	Type:        globals.BATTLESTARTTRAIT,
-	//	Battle: &models.BattleTrait{
-	//		AoE: false,
-	//		Buff: models.Buff{
-	//			StatModifier: models.StatModifier{
-	//				CriticalDamageModifier: 0.0,
-	//				MaxDPS:                 0.50,
-	//				MinDPS:                 0.0,
-	//				CriticalRate:           0.15,
-	//				Defense:                0.0,
-	//				Accuracy:               0.0,
-	//				Evasion:                0.0,
-	//				HP:                     0.0,
-	//				SkillProcRate:          1.0,
-	//				Recovery:               0.0,
-	//				SkillDamageModifier:    0.75,
-	//			},
-	//			Duration: func() *int32 {
-	//				duration := int32(10)
-	//				return &duration
-	//			}(),
-	//		},
-	//	},
-	//}
-	//users[2].JobClass.Trait = &models.Trait{
-	//	Name:        "Poison",
-	//	Description: "Inflict poison damage at a 30% chance",
-	//	Type:        globals.ATTACKTRAIT,
-	//	ActivationRate: func() *float64 {
-	//		duration := float64(0.3)
-	//		return &duration
-	//	}(),
-	//	CrowdControl: &models.CrowdControlTrait{
-	//		Type:             "poison",
-	//		CrowdControlTime: int32(3),
-	//	},
-	//}
 	activeSkills := 1
 	enraged := false
 	adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BOSS ENCOUNTER------------------------**\n__**The Party**__ has encountered **%s**, __**%s**__.\n**------------------------BOSS ENCOUNTER------------------------**", boss.Name, *boss.BossTitle))
@@ -2287,11 +2177,6 @@ bossBattle:
 
 					if updatedUser.CurrentHP <= 0 {
 						if updatedUser.JobClass.Trait != nil && updatedUser.JobClass.Trait.Type == globals.DEATHTRAIT && *updatedUser.JobClass.Trait.UsageCount > 0 {
-							//buffedUser, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.DEATHTRAIT)
-							//bossLogs += buffString
-							//user = buffedUser[0]
-							//user.MaxHP = int(user.BattleStats.HP)
-							//users[i] = user
 							buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{updatedUser}, adventureLog, globals.DEATHTRAIT)
 							updatedUser = buffedUsers[0]
 							bossLogs += buffString
@@ -2322,16 +2207,6 @@ bossBattle:
 				}
 				if updatedUser.CurrentHP <= 0 {
 					if updatedUser.JobClass.Trait != nil && updatedUser.JobClass.Trait.Type == globals.DEATHTRAIT && *updatedUser.JobClass.Trait.UsageCount > 0 {
-						//buffedUser, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.DEATHTRAIT)
-						//bossLogs += buffString
-						//user = buffedUser[0]
-						//user.MaxHP = int(user.BattleStats.HP)
-						//users[i] = user
-						//buffedUser, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.DEATHTRAIT)
-						//bossLogs += buffString
-						//user = buffedUser[0]
-						//user.MaxHP = int(user.BattleStats.HP)
-						//users[i] = user
 						buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{updatedUser}, adventureLog, globals.DEATHTRAIT)
 						updatedUser = buffedUsers[0]
 						bossLogs += buffString
@@ -2819,22 +2694,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	battleStats := *users[0].BattleStats
 	userLevel := user.ClassMap[user.CurrentClass].Level
 	userWeapon := user.ClassMap[user.CurrentClass].Equipment.Weapon.Type.WeaponType
-	//users[0].JobClass.Trait = &models.Trait{
-	//	Name:        "Mech Recall",
-	//	Description: "Your mech was destroyed, but you called another one!",
-	//	Type:        globals.DEATHTRAIT,
-	//	UsageCount: func() *int32 {
-	//		i := int32(1)
-	//		return &i
-	//	}(),
-	//	Battle: &models.BattleTrait{
-	//		Buff: models.Buff{
-	//			StatModifier: models.StatModifier{
-	//				HP: 1.0,
-	//			},
-	//		},
-	//	},
-	//}
+
 	jobClass := users[0].JobClass
 	for currentHP != 0 && monsterHP != 0 {
 		userLog, damage, statusAilment := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, battleStats, monster.Stats, userWeapon, &classInfo, &userLevel, false)
@@ -2901,11 +2761,6 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		}
 		if currentHP <= 0 {
 			if jobClass.Trait != nil && jobClass.Trait.Type == globals.DEATHTRAIT && *jobClass.Trait.UsageCount > 0 {
-				//buffedUser, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.DEATHTRAIT)
-				//bossLogs += buffString
-				//user = buffedUser[0]
-				//user.MaxHP = int(user.BattleStats.HP)
-				//users[i] = user
 				buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{{User: user, JobClass: &classInfo, BaseStats: &userStats, BattleStats: &userStats, MaxHP: userMaxHP}}, adventureLog, globals.DEATHTRAIT)
 				monsterLog += buffString
 				userStats = *buffedUsers[0].BattleStats
@@ -3107,6 +2962,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 	bossEvasion := 0.0
 	bossAccuracy := 0.0
 	bossSkillDmg := 0.0
+	bossTdd := 0.0
 	a.log.Debugf("user bossbonuses: %v", user.ClassMap[user.CurrentClass].BossBonuses)
 	if user.ClassMap[user.CurrentClass].BossBonuses != nil && len(user.ClassMap[user.CurrentClass].BossBonuses) > 0 {
 		for _, bonus := range user.ClassMap[user.CurrentClass].BossBonuses {
@@ -3121,6 +2977,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 			bossEvasion += bonus.Evasion
 			bossAccuracy += bonus.Accuracy
 			bossSkillDmg += bonus.SkillDamageModifier
+			bossTdd += bonus.TargetDefenseDecrease
 		}
 	}
 	baseStats := models.StatModifier{
@@ -3134,6 +2991,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate) + bossSkillProc,
 		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + bossEvasion,
 		Accuracy:               0.85*class.Accuracy + bossAccuracy,
+		TargetDefenseDecrease:  class.TargetDefenseDecrease + bossTdd,
 		SkillDamageModifier:    class.SkillDamageModifier,
 	}
 	equip := user.ClassMap[user.CurrentClass].Equipment

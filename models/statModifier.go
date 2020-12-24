@@ -12,6 +12,7 @@ type StatModifier struct {
 	SkillProcRate          float64 `json:"skillProcRate" firestore:"skillProcRate"`
 	Recovery               float64 `json:"recovery" firestore:"recovery"`
 	SkillDamageModifier    float64 `json:"skillDamageModifier" firestore:"skillDamageModifier"`
+	TargetDefenseDecrease  float64 `json:"targetDefenseDecrease" firestore:"targetDefenseDecrease"`
 }
 
 func (s *StatModifier) AddBuffStats(buffModifiers StatModifier) StatModifier {
@@ -27,6 +28,7 @@ func (s *StatModifier) AddBuffStats(buffModifiers StatModifier) StatModifier {
 		SkillDamageModifier:    buffModifiers.SkillDamageModifier,
 		SkillProcRate:          buffModifiers.SkillProcRate,
 		Recovery:               buffModifiers.Recovery,
+		TargetDefenseDecrease:  buffModifiers.TargetDefenseDecrease,
 	}
 }
 
@@ -42,6 +44,7 @@ func (s *StatModifier) AddStatModifier(stat StatModifier) {
 	s.SkillProcRate += stat.SkillProcRate
 	s.Recovery += stat.Recovery
 	s.SkillDamageModifier += stat.SkillDamageModifier
+	s.TargetDefenseDecrease += stat.TargetDefenseDecrease
 }
 
 func (s *StatModifier) AmplifyStatModifier(stat StatModifier) {
@@ -56,6 +59,7 @@ func (s *StatModifier) AmplifyStatModifier(stat StatModifier) {
 	s.SkillProcRate *= stat.SkillProcRate
 	s.Recovery *= stat.Recovery
 	s.SkillDamageModifier *= stat.SkillDamageModifier
+	s.TargetDefenseDecrease *= stat.TargetDefenseDecrease
 }
 
 func (s *StatModifier) SubtractStatModifier(stat StatModifier) {
@@ -70,4 +74,5 @@ func (s *StatModifier) SubtractStatModifier(stat StatModifier) {
 	s.SkillProcRate -= stat.SkillProcRate
 	s.Recovery -= stat.Recovery
 	s.SkillDamageModifier -= stat.SkillDamageModifier
+	s.TargetDefenseDecrease -= stat.TargetDefenseDecrease
 }
