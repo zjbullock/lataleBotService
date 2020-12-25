@@ -23,6 +23,7 @@ func NewDamageService(log loggo.Logger) Damage {
 		log: log,
 	}
 }
+
 func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderName string, attacker, defender models.StatModifier, weapon *string, class *models.JobClass, userLevel *int32, boss bool) (string, int, *models.CrowdControlTrait) {
 	damageLog := ""
 	hitCount := 1
@@ -42,7 +43,6 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 			}
 		}
 	}
-	d.log.Infof("Skill damage Modifier: %v", attacker.SkillDamageModifier)
 	roundedDamage := 0
 	totalDamage := 0
 	for i := 0; i < hitCount; i++ {

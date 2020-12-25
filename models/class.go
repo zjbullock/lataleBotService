@@ -22,11 +22,23 @@ type Trait struct {
 	UsageCount     *int32             `json:"usageCount,omitempty" firestore:"usageCount,omitempty"`
 	CrowdControl   *CrowdControlTrait `json:"crowdControl,omitempty" firestore:"crowdControl,omitempty"`
 	Battle         *BattleTrait       `json:"battleTrait,omitempty" firestore:"battleTrait,omitempty"`
+	Summon         *SummonTrait       `json:"summonTrait,omitempty" firestore:"summonTrait,omitempty"`
 }
 
 type CrowdControlTrait struct {
 	Type             string `json:"type" firestore:"type"`
 	CrowdControlTime int32  `json:"crowdControlTime,omitempty" firestore:"crowdControlTime"`
+}
+
+type SummonTrait struct {
+	Summons Summons `json:"summons,omitempty" firestore:"summons,omitempty"`
+	Count   int32   `json:"count,omitempty" firestore:"count,omitempty"`
+}
+
+type Summons struct {
+	Name         string       `json:"name,omitempty" firestore:"name,omitempty"`
+	StatModifier StatModifier `json:"stats,omitempty" firestore:"stats,omitempty"`
+	Duration     *int32       `json:"duration,omitempty" firestore:"duration,omitempty"`
 }
 
 type BattleTrait struct {

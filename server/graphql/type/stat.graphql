@@ -10,4 +10,5 @@ type StatInfo {
     SkillProcRate: Float
     SkillDamageModifier: Float
     Recovery: Float
+    TargetDefenseDecrease: Float
 }
