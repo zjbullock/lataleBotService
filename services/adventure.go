@@ -309,7 +309,7 @@ func (a *adventure) JoinParty(partyId, id string) (*string, error) {
 	}
 	//2.  If user is not in party, check that requested party limit is not met.
 	a.log.Debugf("partyMembers: %v", party.Members)
-	if len(party.Members) == 8 {
+	if len(party.Members) == 4 {
 		message := fmt.Sprintf("The requested party is already full!")
 		return &message, nil
 	}
@@ -2140,11 +2140,11 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	}
 	user.LastActionTime = time.Now()
 	//TODO: DISABLE WHEN RUNNING LOCAL
-	//_, err = a.users.UpdateDocument(user.ID, user)
-	//if err != nil {
-	//	a.log.Errorf("failed to update user doc with error: %v", err)
-	//	return adventureLog, nil
-	//}
+	_, err = a.users.UpdateDocument(user.ID, user)
+	if err != nil {
+		a.log.Errorf("failed to update user doc with error: %v", err)
+		return adventureLog, nil
+	}
 	return adventureLog, nil
 }
 
@@ -2435,11 +2435,11 @@ combat:
 				}
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
-			//if err != nil {
-			//	a.log.Errorf("failed to update user doc with error: %v", err)
-			//	return adventureLog, nil
-			//}
+			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			if err != nil {
+				a.log.Errorf("failed to update user doc with error: %v", err)
+				return adventureLog, nil
+			}
 		}
 
 	} else {
@@ -2821,11 +2821,11 @@ bossBattle:
 
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
-			//if err != nil {
-			//	a.log.Errorf("failed to update winningUsers doc with error: %v", err)
-			//	return adventureLog, nil
-			//}
+			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			if err != nil {
+				a.log.Errorf("failed to update winningUsers doc with error: %v", err)
+				return adventureLog, nil
+			}
 		}
 
 	} else {
