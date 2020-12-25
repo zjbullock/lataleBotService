@@ -309,7 +309,7 @@ func (a *adventure) JoinParty(partyId, id string) (*string, error) {
 	}
 	//2.  If user is not in party, check that requested party limit is not met.
 	a.log.Debugf("partyMembers: %v", party.Members)
-	if len(party.Members) == 8 {
+	if len(party.Members) == 4 {
 		message := fmt.Sprintf("The requested party is already full!")
 		return &message, nil
 	}
