@@ -52,10 +52,11 @@ type adventure struct {
 	boss      repositories.BossRepository
 	item      repositories.ItemRepository
 	damage    Damage
+	env       map[string]interface{}
 	log       loggo.Logger
 }
 
-func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, config repositories.ConfigRepository, party repositories.PartyRepository, boss repositories.BossRepository, item repositories.ItemRepository, log loggo.Logger) Adventure {
+func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, config repositories.ConfigRepository, party repositories.PartyRepository, boss repositories.BossRepository, item repositories.ItemRepository, env map[string]interface{}, log loggo.Logger) Adventure {
 	return &adventure{
 		areas:     areas,
 		classes:   classes,
@@ -67,6 +68,7 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 		damage:    NewDamageService(log),
 		boss:      boss,
 		item:      item,
+		env:       env,
 		log:       log,
 	}
 }
@@ -1784,6 +1786,9 @@ func (a *adventure) generatePartyBlob(user *models.User) ([]*models.UserBlob, er
 func (a *adventure) checkAdventureCooldown(user *models.User, boss bool) (*string, bool) {
 	var lastAction time.Time
 	var commandType string
+	if a.env["environment"] != "PR" {
+		return nil, false
+	}
 	if boss {
 		lastAction = user.LastBossActionTime.Add(20 * time.Minute)
 		commandType = "boss"
@@ -2475,56 +2480,61 @@ bossBattle:
 	for len(users) != 0 && bossCurrentHp != 0 {
 		userLogs := ""
 		for i, user := range users {
+			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.SUMMONTRAIT && user.JobClass.Trait.ActivationRate != nil {
+				summonChance := rand.Float64()
+
+				if summonChance <= *user.JobClass.Trait.ActivationRate {
+					summonLogs, newSummons := a.generateSummons(user.User.Name, user.Summons, *user.JobClass.Trait.Summon, *user.BattleStats)
+					userLogs += summonLogs + "\n"
+					user.Summons = newSummons
+				}
+			}
+			damage := 0
+			var statusAilment *models.CrowdControlTrait = nil
 			if user.CrowdControlled != nil && *user.CrowdControlled != 0 && *user.CrowdControlStatus != "poison" && *user.CrowdControlStatus != "burn" && *user.CrowdControlStatus != "bleed" {
 				userLogs += fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.\n", user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
 			} else {
-				if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.SUMMONTRAIT && user.JobClass.Trait.ActivationRate != nil {
-					summonChance := rand.Float64()
-
-					if summonChance <= *user.JobClass.Trait.ActivationRate {
-						summonLogs, newSummons := a.generateSummons(user.User.Name, user.Summons, *user.JobClass.Trait.Summon, *user.BattleStats)
-						userLogs += summonLogs + "\n"
-						user.Summons = newSummons
-					}
-				}
-				userLog, damage, statusAilment := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.BattleStats, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
-				if len(user.Summons) > 0 {
-					for i, summon := range user.Summons {
-						summonLog, summonDamage, _ := a.damage.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), boss.Name, summon.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
-						userLog += "\n" + summonLog
-						damage += summonDamage
-					}
-				}
-				bossCurrentHp = ((int(bossCurrentHp) - int(damage)) + int(math.Abs(float64(bossCurrentHp-damage)))) / 2
+				userLog, userDamage, userInflictedAilment := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.BattleStats, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
 				userLogs += userLog + "\n"
-				if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.AFTERATTACKTRAIT && user.JobClass.Trait.ActivationRate != nil {
-					activationChance := rand.Float64()
-					if user.JobClass.Trait.CrowdControl != nil && activationChance <= *user.JobClass.Trait.ActivationRate {
-						userLogs += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
-						if user.JobClass.Trait.CrowdControl.Type == "drain" {
-							bossCurrentHp = int(float64(bossCurrentHp) * 0.95)
-							drainHp := int(float64(users[i].MaxHP) * 0.10)
-							if users[i].CurrentHP+drainHp > users[i].MaxHP {
-								users[i].CurrentHP = users[i].MaxHP
-							} else {
-								users[i].CurrentHP += drainHp
-							}
-							userLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, drainHp)
-							userLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, users[i].CurrentHP, user.MaxHP)
-						}
-					}
-				}
-				bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
-				if damage > 0 {
-					userLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
-				}
-				if statusAilment != nil {
-					if boss.StatusAilments == nil {
-						boss.StatusAilments = make(map[string]int)
-					}
-					boss.StatusAilments[statusAilment.Type] = int(statusAilment.CrowdControlTime)
+				damage += userDamage
+				statusAilment = userInflictedAilment
+			}
+			if len(user.Summons) > 0 {
+				for i, summon := range user.Summons {
+					summonLog, summonDamage, _ := a.damage.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), boss.Name, summon.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
+					userLogs += summonLog + "\n"
+					damage += summonDamage
 				}
 			}
+			bossCurrentHp = ((int(bossCurrentHp) - int(damage)) + int(math.Abs(float64(bossCurrentHp-damage)))) / 2
+			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.AFTERATTACKTRAIT && user.JobClass.Trait.ActivationRate != nil {
+				activationChance := rand.Float64()
+				if user.JobClass.Trait.CrowdControl != nil && activationChance <= *user.JobClass.Trait.ActivationRate {
+					userLogs += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
+					if user.JobClass.Trait.CrowdControl.Type == "drain" {
+						bossCurrentHp = int(float64(bossCurrentHp) * 0.95)
+						drainHp := int(float64(users[i].MaxHP) * 0.10)
+						if users[i].CurrentHP+drainHp > users[i].MaxHP {
+							users[i].CurrentHP = users[i].MaxHP
+						} else {
+							users[i].CurrentHP += drainHp
+						}
+						userLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, drainHp)
+						userLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, users[i].CurrentHP, user.MaxHP)
+					}
+				}
+			}
+			bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
+			if damage > 0 {
+				userLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
+			}
+			if statusAilment != nil {
+				if boss.StatusAilments == nil {
+					boss.StatusAilments = make(map[string]int)
+				}
+				boss.StatusAilments[statusAilment.Type] = int(statusAilment.CrowdControlTime)
+			}
+
 			debuffLogs, changedUser := a.decreaseBuffDuration(user)
 			if changedUser != nil {
 				users[i] = changedUser
