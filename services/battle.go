@@ -34,13 +34,15 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 			damageLog += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!", attackerName, class.Trait.Name)
 			if class.Trait.Battle != nil {
 				hitCount = int(class.Trait.Battle.HitCounter)
-				attacker.AddStatModifier(class.Trait.Battle.Buff.StatModifier)
+				newStats := attacker.AddBuffStats(class.Trait.Battle.Buff.StatModifier)
+				attacker.AddStatModifier(newStats)
 			}
 			if class.Trait.CrowdControl != nil {
 				statusAilment = *class.Trait.CrowdControl
 			}
 		}
 	}
+	d.log.Infof("Skill damage Modifier: %v", attacker.SkillDamageModifier)
 	roundedDamage := 0
 	totalDamage := 0
 	for i := 0; i < hitCount; i++ {
@@ -71,11 +73,12 @@ func (d *damage) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 		damage := float64(rand.Intn(int(attacker.MaxDPS)-int(attacker.MinDPS))) + attacker.MinDPS
 		skillChance := randGenerator.Float64()
 		if attacker.SkillProcRate != 0.0 && skillChance <= attacker.SkillProcRate {
-			skillName, damageMod := d.getSkill(randGenerator, *weapon, *class, int(*userLevel))
+			skillName, damageMod := d.getSkill(randGenerator, *weapon, *class, int(*userLevel), attacker.SkillDamageModifier)
 			damage = damage * 1.25 * damageMod
 			damageLog += fmt.Sprintf("with the skill ***%s*** ", skillName)
 		}
-		roundedDamage = ((int(damage) - int(defender.Defense)) + int(math.Abs(damage-defender.Defense))) / 2
+		defenderDefense := defender.Defense - (defender.Defense * attacker.TargetDefenseDecrease)
+		roundedDamage = ((int(damage) - int(defenderDefense)) + int(math.Abs(damage-defenderDefense))) / 2
 
 		criticalChance := randGenerator.Float64()
 		damageLog += fmt.Sprintf("for ")
@@ -134,7 +137,7 @@ func (d *damage) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 	return updatedUser, damageLog, roundedDamage
 }
 
-func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobClass models.JobClass, userLevel int) (string, float64) {
+func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobClass models.JobClass, userLevel int, skillDamageModifier float64) (string, float64) {
 	skill := ""
 	damageMod := 1.0
 	for _, weapon := range jobClass.Weapons {
@@ -159,7 +162,7 @@ func (d *damage) getSkill(randGenerator *rand.Rand, currentWeapon string, jobCla
 				tier = 1
 			}
 			skill = weapon.Skills[tier]
-			damageMod = ((float64(tier) / 10.0 * 2.0) + 1.0) * jobClass.Stats.SkillDamageModifier
+			damageMod = ((float64(tier) / 10.0 * 2.0) + 1.0) * skillDamageModifier
 		}
 	}
 	return skill, damageMod
