@@ -7,11 +7,17 @@ input Trait {
     UsageCount: Int
     CrowdControl: CrowdControlTrait
     Battle: BattleTrait
+    Summon: SummonTrait
 }
 
 input CrowdControlTrait {
     Type: String!
     CrowdControlTime: Int!
+}
+
+input SummonTrait {
+    Summons: Summons!
+    Count: Int!
 }
 
 input BattleTrait {

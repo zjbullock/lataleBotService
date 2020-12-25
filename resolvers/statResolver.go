@@ -57,3 +57,7 @@ func (s *statResolver) Recovery(_ context.Context) *float64 {
 func (s *statResolver) SkillDamageModifier(_ context.Context) *float64 {
 	return &s.stat.SkillDamageModifier
 }
+
+func (s *statResolver) TargetDefenseDecrease(_ context.Context) *float64 {
+	return &s.stat.TargetDefenseDecrease
+}

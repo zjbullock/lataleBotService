@@ -34,6 +34,7 @@ type UserBlob struct {
 	Weapon             string
 	CrowdControlled    *int32
 	CrowdControlStatus *string
+	Summons            []Summons
 }
 
 type MonsterBlob struct {
