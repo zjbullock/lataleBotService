@@ -309,7 +309,7 @@ func (a *adventure) JoinParty(partyId, id string) (*string, error) {
 	}
 	//2.  If user is not in party, check that requested party limit is not met.
 	a.log.Debugf("partyMembers: %v", party.Members)
-	if len(party.Members) == 4 {
+	if len(party.Members) == 8 {
 		message := fmt.Sprintf("The requested party is already full!")
 		return &message, nil
 	}
@@ -2382,11 +2382,11 @@ bossBattle:
 
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
-			if err != nil {
-				a.log.Errorf("failed to update winningUsers doc with error: %v", err)
-				return adventureLog, nil
-			}
+			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			//if err != nil {
+			//	a.log.Errorf("failed to update winningUsers doc with error: %v", err)
+			//	return adventureLog, nil
+			//}
 		}
 
 	} else {
@@ -2635,18 +2635,18 @@ combat:
 					userInfo.Inventory.Consume = make(map[string]int)
 				}
 				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 25 {
-					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", userInfo.Name))
 				} else {
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 					userInfo.Inventory.Equipment[item.Name]++
 				}
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
-			if err != nil {
-				a.log.Errorf("failed to update user doc with error: %v", err)
-				return adventureLog, nil
-			}
+			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			//if err != nil {
+			//	a.log.Errorf("failed to update user doc with error: %v", err)
+			//	return adventureLog, nil
+			//}
 		}
 
 	} else {
@@ -2850,7 +2850,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 				user.Inventory.Consume = make(map[string]int)
 			}
 			if user.Inventory.Equipment[item.Name] == 0 && len(user.Inventory.Equipment) >= 25 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", user.Name))
 			} else {
 				newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 				user.Inventory.Equipment[item.Name]++
@@ -2877,7 +2877,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 				user.Inventory.Consume = make(map[string]int)
 			}
 			if user.Inventory.Equipment[item.Name] == 0 && len(user.Inventory.Equipment) >= 25 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", *item.Type.WeaponType))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", user.Name))
 			} else {
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 				user.Inventory.Equipment[item.Name]++
@@ -2888,11 +2888,11 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	}
 	user.LastActionTime = time.Now()
 	//TODO: DISABLE WHEN RUNNING LOCAL
-	_, err = a.users.UpdateDocument(user.ID, user)
-	if err != nil {
-		a.log.Errorf("failed to update user doc with error: %v", err)
-		return adventureLog, nil
-	}
+	//_, err = a.users.UpdateDocument(user.ID, user)
+	//if err != nil {
+	//	a.log.Errorf("failed to update user doc with error: %v", err)
+	//	return adventureLog, nil
+	//}
 	return adventureLog, nil
 }
 
@@ -3009,7 +3009,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + bossEvasion,
 		Accuracy:               0.85*class.Accuracy + bossAccuracy,
 		TargetDefenseDecrease:  class.TargetDefenseDecrease + bossTdd,
-		SkillDamageModifier:    class.SkillDamageModifier,
+		SkillDamageModifier:    class.SkillDamageModifier + bossSkillDmg,
 	}
 	equip := user.ClassMap[user.CurrentClass].Equipment
 	gearStats, err := a.getStatsFromGear(&equip)
