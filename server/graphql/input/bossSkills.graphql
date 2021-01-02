@@ -3,7 +3,9 @@ input BossSkills {
     Quote: String!
     CrowdControl: Int
     CrowdControlStatus: String
+    Debuff: Stat
     AoE: Boolean!
+    Bind: Boolean!
     SkillDamageModifier: Float!
     CoolDown: Int!
 }

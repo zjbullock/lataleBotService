@@ -51,7 +51,7 @@ type adventure struct {
 	party     repositories.PartyRepository
 	boss      repositories.BossRepository
 	item      repositories.ItemRepository
-	damage    Damage
+	Battle    Battle
 	env       map[string]interface{}
 	log       loggo.Logger
 }
@@ -65,7 +65,7 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 		levels:    levels,
 		config:    config,
 		party:     party,
-		damage:    NewDamageService(log),
+		Battle:    NewBattleService(log),
 		boss:      boss,
 		item:      item,
 		env:       env,
@@ -534,6 +534,16 @@ func (a *adventure) ClassChange(id, class string, weapon *string) (*string, erro
 		message := fmt.Sprintf("The %s class does not exist.  Please select a valid class with a valid weapon", class)
 		return &message, nil
 	}
+	if classInfo.ClassRequirement != nil {
+		for _, weaponInfo := range classInfo.Weapons {
+			if _, ok := user.ClassMap[*classInfo.ClassRequirement]; ok {
+				if weaponInfo.Name == *user.ClassMap[*classInfo.ClassRequirement].Equipment.Weapon.Type.WeaponType {
+					newWeapon := weaponInfo.Name
+					weapon = &newWeapon
+				}
+			}
+		}
+	}
 
 	if user.ClassMap[class] == nil && weapon != nil {
 		currentWeapon := strings.Title(strings.ToLower(*weapon))
@@ -658,9 +668,11 @@ func (a *adventure) ClassChange(id, class string, weapon *string) (*string, erro
 			return &message, nil
 		} else {
 			fmt.Printf("userClasses: %v\n", user.ClassMap)
+			a.log.Infof("weapon, %v", currentWeapon)
 			for _, learnedClass := range user.ClassMap {
 				if learnedClass.Name == *classInfo.ClassRequirement && learnedClass.Level >= classInfo.LevelRequirement {
-					message, err := a.ClassAdvance(id, strings.Title(strings.ToLower(*weapon)), class, &learnedClass.Name)
+					a.log.Infof("weapon, %s", currentWeapon)
+					message, err := a.ClassAdvance(id, strings.Title(strings.ToLower(currentWeapon)), class, &learnedClass.Name)
 					if err != nil {
 						a.log.Errorf("error while switching and upgrading a class: %v", err)
 						return nil, err
@@ -672,7 +684,7 @@ func (a *adventure) ClassChange(id, class string, weapon *string) (*string, erro
 			return &message, nil
 		}
 	}
-	message := "Please provide a weapon, as this is your first time creating this class."
+	message := "Please provide a weapon, as this is your first time creating this class, and you do not currently have the required weapon type equipped."
 	return &message, nil
 }
 
@@ -801,20 +813,28 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips *models.Equi
 	if tier == 4 {
 		equipLevel = 140
 	}
-	weapon, err := a.item.QueryForDocument(&[]models.QueryArg{
-		{
-			Path:  "levelRequirement",
-			Op:    "==",
-			Value: equipLevel,
-		},
-		{
-			Path:  "type.weaponType",
-			Op:    "==",
-			Value: weaponType,
-		},
-	})
-	if err != nil {
-		panic("error getting weapon!")
+	var weapon *models.Item
+	a.log.Infof("weaponType, %s", weaponType)
+	if weaponType == *currentEquips.Weapon.Type.WeaponType && tier > 2 {
+		a.log.Infof("Type.WeaponType: %s", *currentEquips.Weapon.Type.WeaponType)
+		weapon = &currentEquips.Weapon
+	} else {
+		newWeapon, err := a.item.QueryForDocument(&[]models.QueryArg{
+			{
+				Path:  "levelRequirement",
+				Op:    "==",
+				Value: equipLevel,
+			},
+			{
+				Path:  "type.weaponType",
+				Op:    "==",
+				Value: weaponType,
+			},
+		})
+		if err != nil {
+			panic("error getting weapon!")
+		}
+		weapon = newWeapon
 	}
 	top, err := a.item.QueryForDocument(&[]models.QueryArg{
 		{
@@ -1090,7 +1110,7 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips *models.Equi
 //		oldGlasses := strconv.FormatFloat(oldEquipSheet.GlassesCritDamage*100.0, 'f', -1, 64)
 //		glasses := strconv.FormatFloat(equipSheet.GlassesCritDamage*100.0, 'f', -1, 64)
 //		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
-//		message += fmt.Sprintf("Critical Damage gained from glasses: **%s%%** -> **%s%%**\n", oldGlasses, glasses)
+//		message += fmt.Sprintf("Critical Battle gained from glasses: **%s%%** -> **%s%%**\n", oldGlasses, glasses)
 //		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 //	case "earrings", "earring":
 //		oldEarrings := strconv.FormatFloat(oldEquipSheet.EarringCritRate*100.0, 'f', -1, 64)
@@ -1106,7 +1126,7 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips *models.Equi
 //		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 //	case "cloak", "mantle":
 //		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.AccessoryCost))
-//		message += fmt.Sprintf("Damage gained from cloak: **%1.f** -> **%1.f**\n", oldEquipSheet.MantleDamage, equipSheet.MantleDamage)
+//		message += fmt.Sprintf("Battle gained from cloak: **%1.f** -> **%1.f**\n", oldEquipSheet.MantleDamage, equipSheet.MantleDamage)
 //		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 //	case "stockings":
 //		oldStockingsEvasion := strconv.FormatFloat(oldEquipSheet.StockingEvasion*100.0, 'f', -1, 64)
@@ -1116,7 +1136,7 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips *models.Equi
 //		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 //	case "weapon":
 //		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
-//		message += fmt.Sprintf("Damage gained from weapon: **%1.f** -> **%1.f**\n", oldEquipSheet.WeaponDPS, equipSheet.WeaponDPS)
+//		message += fmt.Sprintf("Battle gained from weapon: **%1.f** -> **%1.f**\n", oldEquipSheet.WeaponDPS, equipSheet.WeaponDPS)
 //		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 //	case "shoe", "shoes", "boot", "boots":
 //		oldShoeEvasion := strconv.FormatFloat(oldEquipSheet.ShoeEvasion*100.0, 'f', -1, 64)
@@ -1131,7 +1151,7 @@ func (a *adventure) determineStartingGear(tier int32, currentEquips *models.Equi
 //		gloveCritDamage := strconv.FormatFloat(equipSheet.GloveCriticalDamage*100.0, 'f', -1, 64)
 //		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
 //		message += fmt.Sprintf("Accuracy gained from gloves: **%s%%** -> **%s%%**\n", oldGloveAccuracy, gloveAccuracy)
-//		message += fmt.Sprintf("Critical Damage gained from gloves: **%s%%** -> **%s%%**\n", oldGloveCritDamage, gloveCritDamage)
+//		message += fmt.Sprintf("Critical Battle gained from gloves: **%s%%** -> **%s%%**\n", oldGloveCritDamage, gloveCritDamage)
 //		message += fmt.Sprintf("Level requirement: %v", equipSheet.LevelRequirement)
 //	case "body":
 //		message += fmt.Sprintf("The cost of upgrading your %s is %s ely.\n", equipment, utils.String(equipSheet.Cost))
@@ -1455,8 +1475,8 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		message := fmt.Sprintf("Unable to get class info for %s", user.Name)
 		return nil, &message, err
 	}
-	user.Buffs = make(map[string]*models.Buff)
-	adventureLog, err := a.createAdventureLog(*classInfo, user, *currentStats, monster, area.DropRange)
+
+	adventureLog, err := a.createAdventureLog([]*models.UserBlob{{User: user, JobClass: classInfo, BaseStats: currentStats, BattleStats: currentStats, MaxHP: int(currentStats.HP), HitCount: 1, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait)}}, models.MonsterBlob{Monster: monster, Name: monster.Name, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait), Rank: monster.Rank}, area.DropRange)
 	if err != nil {
 		a.log.Errorf("encountered error generating adventure log: %v", err)
 		return &adventureLog, nil, err
@@ -1518,9 +1538,12 @@ func (a *adventure) generateMonsterBlob(area *models.Area, randSource rand.Sourc
 		encounteredMonsters = append(encounteredMonsters, &models.MonsterBlob{
 			CurrentHP:    int32(monster.Stats.HP),
 			StatModifier: &monster.Stats,
+			BattleStats:  &monster.Stats,
 			Name:         monster.Name + " " + string('A'+i) + monsterRank,
 			Ely:          monster.Ely,
 			Exp:          monster.Exp,
+			Buffs:        make(map[string]models.Buff),
+			Debuffs:      make(map[string]models.CrowdControlTrait),
 		})
 	}
 	return encounteredMonsters, nil
@@ -1765,8 +1788,6 @@ func (a *adventure) generatePartyBlob(user *models.User) ([]*models.UserBlob, er
 			a.log.Errorf("error getting current class: %v", err)
 			return nil, err
 		}
-
-		userInfo.Buffs = make(map[string]*models.Buff)
 		currentWeapon := userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType
 		battleStats := *userStats
 		partyMemberInfos = append(partyMemberInfos, &models.UserBlob{
@@ -1778,6 +1799,9 @@ func (a *adventure) generatePartyBlob(user *models.User) ([]*models.UserBlob, er
 			MaxHP:       int(userStats.HP),
 			UserLevel:   userInfo.ClassMap[userInfo.CurrentClass].Level,
 			Weapon:      *currentWeapon,
+			Buffs:       make(map[string]models.Buff),
+			Debuffs:     make(map[string]models.CrowdControlTrait),
+			HitCount:    1,
 		})
 	}
 	return partyMemberInfos, nil
@@ -1854,7 +1878,7 @@ func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, er
 	if len(adventureLog) != 0 {
 		return &adventureLog, nil, nil
 	}
-	adventureLog, err = a.bossBattleLog(partyMembers, boss, user.ID)
+	adventureLog, err = a.bossBattleLog(partyMembers, models.MonsterBlob{Monster: *boss, Name: boss.Name, Ely: boss.Ely, Exp: boss.Exp, StatModifier: &boss.Stats, BattleStats: &boss.Stats, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait)}, user.ID)
 	if err != nil {
 		a.log.Errorf("error while generating boss log: %v", err)
 		return nil, nil, err
@@ -1893,49 +1917,46 @@ func (a *adventure) determineMonster(monsters []models.Monster, rarityGenerator 
 	return monsters[monster]
 }
 
-func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.User, userStats models.StatModifier, monster models.Monster, dropRange models.LevelRange) ([]string, error) {
+func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.MonsterBlob, dropRange models.LevelRange) ([]string, error) {
 	var adventureLog []string
-	logLine, onCooldown := a.checkAdventureCooldown(user, false)
+	logLine, onCooldown := a.checkAdventureCooldown(users[0].User, false)
 	if onCooldown {
 		adventureLog = append(adventureLog, *logLine)
 		return adventureLog, nil
 	}
 	battleWin := false
-	userMaxHP := int(userStats.HP)
-	monsterMaxHp := int(monster.Stats.HP)
-	currentHP := int(userStats.HP)
-	monsterHP := int(monster.Stats.HP)
+	userMaxHP := int(users[0].BaseStats.HP)
+	monsterMaxHp := int(monster.Monster.Stats.HP)
+	currentHP := int(users[0].BaseStats.HP)
+	monsterHP := int(monster.Monster.Stats.HP)
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGenerator := rand.New(randSource)
 	rankExclamation := ""
 	for i := int32(0); i < monster.Rank; i++ {
 		rankExclamation += "!"
 	}
-	adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has encountered a __**%s**__**%s**", user.Name, monster.Name, rankExclamation))
-	users, buffString := a.determineBuffs([]*models.UserBlob{{User: user, JobClass: &classInfo, BaseStats: &userStats, BattleStats: &userStats, MaxHP: userMaxHP}}, adventureLog, globals.BATTLESTARTTRAIT)
+	adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has encountered a __**%s**__ **%s**", users[0].User.Name, monster.Name, rankExclamation))
+	users, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.BATTLESTARTTRAIT, true)
 	adventureLog = append(adventureLog, buffString)
-	user = users[0].User
 	battleStats := *users[0].BattleStats
-	userLevel := user.ClassMap[user.CurrentClass].Level
-	userWeapon := user.ClassMap[user.CurrentClass].Equipment.Weapon.Type.WeaponType
-	var summons []models.Summons
+	userLevel := users[0].User.ClassMap[users[0].User.CurrentClass].Level
+	userWeapon := users[0].User.ClassMap[users[0].User.CurrentClass].Equipment.Weapon.Type.WeaponType
+	summons := users[0].Summons
 	jobClass := users[0].JobClass
-	a.log.Infof("JobClass: %v", jobClass.Trait.Summon)
 	for currentHP != 0 && monsterHP != 0 {
 		if jobClass.Trait != nil && jobClass.Trait.Type == globals.SUMMONTRAIT && jobClass.Trait.ActivationRate != nil {
 			summonChance := rand.Float64()
 
 			if summonChance <= *jobClass.Trait.ActivationRate {
-				summonLogs, newSummons := a.generateSummons(user.Name, summons, *jobClass.Trait.Summon, battleStats)
+				summonLogs, newSummons := a.Battle.GenerateSummons(users[0].User.Name, summons, *jobClass.Trait.Summon, battleStats)
 				adventureLog = append(adventureLog, summonLogs)
 				summons = newSummons
 			}
 		}
-		userLog, damage, statusAilment := a.damage.DetermineHit(randGenerator, user.Name, monster.Name, battleStats, monster.Stats, userWeapon, &classInfo, &userLevel, false)
-		a.log.Infof("Summons: %v", summons)
+		userLog, damage, statusAilment := a.Battle.DetermineHit(randGenerator, users[0].User.Name, monster.Name, battleStats, monster.Monster.Stats, userWeapon, users[0].JobClass, &userLevel, false, users[0].HitCount)
 		if len(summons) > 0 {
 			for i, summon := range summons {
-				summonLog, summonDamage, _ := a.damage.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), monster.Name, summon.StatModifier, monster.Stats, userWeapon, &classInfo, &userLevel, false)
+				summonLog, summonDamage, _ := a.Battle.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), monster.Name, summon.StatModifier, monster.Monster.Stats, userWeapon, users[0].JobClass, &userLevel, false, users[0].HitCount)
 				userLog += "\n" + summonLog
 				damage += summonDamage
 			}
@@ -1944,7 +1965,7 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		if jobClass.Trait != nil && jobClass.Trait.Type == globals.AFTERATTACKTRAIT && jobClass.Trait.ActivationRate != nil {
 			activationChance := rand.Float64()
 			if jobClass.Trait.CrowdControl != nil && activationChance <= *jobClass.Trait.ActivationRate {
-				userLog += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.Name, jobClass.Trait.Name)
+				userLog += fmt.Sprintf("__**%s**__ activated their trait, __**%s**__!\n", users[0].User.Name, jobClass.Trait.Name)
 				if jobClass.Trait.CrowdControl.Type == "drain" {
 					monsterHP = int(float64(monsterHP) * 0.95)
 					drainHp := int(float64(userMaxHP) * 0.10)
@@ -1953,8 +1974,8 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 					} else {
 						currentHP += drainHp
 					}
-					userLog += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.Name, drainHp)
-					userLog += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.Name, currentHP, userMaxHP)
+					userLog += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", users[0].User.Name, drainHp)
+					userLog += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", users[0].User.Name, currentHP, userMaxHP)
 					userMaxHP += drainHp
 				}
 			}
@@ -1963,93 +1984,130 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			userLog += fmt.Sprintf("\n__**%s**__'s HP: %v/%v\n", monster.Name, monsterHP, monsterMaxHp)
 		}
 		if statusAilment != nil {
-			if monster.StatusAilments == nil {
-				monster.StatusAilments = make(map[string]int)
+			monsterDebuffLogs, newMonster := a.Battle.InflictStatusAilmentMonster(&monster, *statusAilment)
+			userLog += monsterDebuffLogs
+			monster = *newMonster
+			if statusAilment.Bind {
+				monster.Bound = true
 			}
-			monster.StatusAilments[statusAilment.Type] = int(statusAilment.CrowdControlTime)
-
 		}
-		if len(user.Buffs) > 0 {
-			userBlob := models.UserBlob{User: user, BaseStats: &userStats, BattleStats: &battleStats}
-			debuffLogs, changedUser := a.decreaseBuffDuration(&userBlob)
+		if len(users[0].Buffs) > 0 {
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(users[0])
 			if changedUser != nil {
-				userBlob = *changedUser
-				user = userBlob.User
-				battleStats = *userBlob.BattleStats
+				users[0] = changedUser
+				battleStats = *users[0].BattleStats
 			}
-			if debuffLogs != "" {
-				adventureLog = append(adventureLog, debuffLogs)
+			if buffLogs != "" {
+				userLog += buffLogs
 			}
 		}
+		buffedUsers, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
+		users[0] = buffedUsers[0]
+		battleStats = *buffedUsers[0].BattleStats
+		userLog += buffString + "\n"
 		if monsterHP <= 0 {
-			userLog += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", user.Name, monster.Name)
+			userLog += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", users[0].User.Name, monster.Name)
 			adventureLog = append(adventureLog, fmt.Sprintf("%s", userLog))
 			battleWin = true
 			break
 		}
-		for ailment, duration := range monster.StatusAilments {
-			if ailment == "poison" || ailment == "bleed" {
+		for ailment, debuff := range monster.Debuffs {
+			if ailment == "poison" || ailment == "bleed" || ailment == "burn" {
 				damageOvertime := 0.0
-				if ailment == "poison" {
-					damageOvertime = float64(monster.Stats.HP) * 0.05
-
-				} else if ailment == "bleed" {
-					damageOvertime = float64(monsterHP) * 0.10
+				switch ailment {
+				case "poison":
+					damageOvertime = float64(monster.Monster.Stats.HP) * 0.05
+					break
+				case "burn":
+					damageOvertime = float64(monster.Monster.Stats.HP) * 0.025
+					break
+				case "bleed":
+					damageOvertime = float64(monsterHP) * 0.1
+					break
 				}
 				monsterHP = (monsterHP - int(damageOvertime)) + int(math.Abs(float64(monsterHP)-damageOvertime))/2
-				userLog += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", monster.Name, int(damageOvertime), ailment, monster.Name, ailment, duration)
-				userLog += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", monster.Name, monsterHP, int(monster.Stats.HP))
+				userLog += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", monster.Name, int(damageOvertime), ailment, monster.Name, ailment, debuff.CrowdControlTime)
+				userLog += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", monster.Name, monsterHP, int(monster.Monster.Stats.HP))
 				if monsterHP <= 0 {
-					userLog += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", user.Name, monster.Name)
+					userLog += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", users[0].User.Name, monster.Name)
 					adventureLog = append(adventureLog, fmt.Sprintf("%s", userLog))
 					battleWin = true
 					break
 				}
 			}
-			monster.StatusAilments[ailment]--
-			if monster.StatusAilments[ailment] == 0 {
-				delete(monster.StatusAilments, ailment)
+			if debuff.Bind {
+				monster.Bound = true
+			}
+			monsterDebuffLogs, newMonster := a.Battle.DecreaseMonsterDebuffDuration(&monster)
+			if newMonster != nil {
+				monster = *newMonster
+			}
+			if monsterDebuffLogs != "" {
+				userLog += monsterDebuffLogs + "\n"
 			}
 		}
 		adventureLog = append(adventureLog, fmt.Sprintf("%s", userLog))
-
-		monsterLog, damage, _ := a.damage.DetermineHit(randGenerator, monster.Name, user.Name, monster.Stats, battleStats, nil, nil, nil, false)
-		currentHP = ((int(currentHP) - int(damage)) + int(math.Abs(float64(currentHP-damage)))) / 2
-		monsterLog = "				" + monsterLog
-		if damage > 0 {
-			monsterLog += fmt.Sprintf("\n				__**%s**__'s HP: %v/%v\n", user.Name, currentHP, userMaxHP)
-		}
-		if currentHP <= 0 {
-			if jobClass.Trait != nil && jobClass.Trait.Type == globals.DEATHTRAIT && *jobClass.Trait.UsageCount > 0 {
-				buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{{User: user, JobClass: &classInfo, BaseStats: &userStats, BattleStats: &userStats, MaxHP: userMaxHP}}, adventureLog, globals.DEATHTRAIT)
-				monsterLog += buffString
-				userStats = *buffedUsers[0].BattleStats
-				userMaxHP = int(userStats.HP)
-				currentHP = userMaxHP
-				skillUsage := *jobClass.Trait.UsageCount
-				skillUsage--
-				jobClass.Trait.UsageCount = &skillUsage
+		if !monster.Bound {
+			monsterLog, damage, _ := a.Battle.DetermineHit(randGenerator, monster.Name, users[0].User.Name, monster.Monster.Stats, battleStats, nil, nil, nil, false, 1)
+			currentHP = ((int(currentHP) - int(damage)) + int(math.Abs(float64(currentHP-damage)))) / 2
+			monsterLog = "				" + monsterLog
+			if damage > 0 {
+				monsterLog += fmt.Sprintf("\n				__**%s**__'s HP: %v/%v\n", users[0].User.Name, currentHP, userMaxHP)
+				if len(summons) > 0 {
+					var aliveSummons []models.Summons
+					for i, summon := range summons {
+						if summons[i].Duration == nil {
+							summons[i].StatModifier.HP -= float64(damage)
+							monsterLog += fmt.Sprintf("\n				 __**%s**__ has also taken **%v** damage!\n", summon.Name+" "+strconv.Itoa(i+1), int(damage))
+							if summons[i].StatModifier.HP > 0.0 {
+								monsterLog += fmt.Sprintf("				__**%s**__'s remaining HP: **%v**\n", summon.Name+" "+strconv.Itoa(i+1), int(summons[i].StatModifier.HP))
+								aliveSummons = append(aliveSummons, summons[i])
+							} else {
+								monsterLog += fmt.Sprintf("__**%s**__'s has died!\n", summon.Name+" "+strconv.Itoa(i+1))
+							}
+						}
+					}
+					summons = aliveSummons
+				}
 			} else {
-				monsterLog += fmt.Sprintf("				**%s was killed by %s!**\n", user.Name, monster.Name)
-				adventureLog = append(adventureLog, fmt.Sprintf("%s", monsterLog))
-				break
+				monsterLog += "\n"
 			}
+			if currentHP <= 0 {
+				if jobClass.Trait != nil && jobClass.Trait.Type == globals.DEATHTRAIT && *jobClass.Trait.UsageCount > 0 {
+					buffedUsers, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.DEATHTRAIT, false)
+					monsterLog += buffString
+					userMaxHP = int(buffedUsers[0].BattleStats.HP)
+					currentHP = userMaxHP
+					skillUsage := *jobClass.Trait.UsageCount
+					skillUsage--
+					jobClass.Trait.UsageCount = &skillUsage
+				} else {
+					monsterLog += fmt.Sprintf("				**%s was killed by %s!**\n", users[0].User.Name, monster.Name)
+					adventureLog = append(adventureLog, fmt.Sprintf("%s", monsterLog))
+					break
+				}
+			}
+			adventureLog = append(adventureLog, fmt.Sprintf("%s", monsterLog))
+		} else {
+			adventureLog = append(adventureLog, fmt.Sprintf("				**%s** can't move due to being bound!\n", monster.Name))
+			monster.Bound = false
 		}
-		adventureLog = append(adventureLog, fmt.Sprintf("%s", monsterLog))
-		if classInfo.Trait != nil && classInfo.Trait.HPTrigger != nil && float64(currentHP)/float64(userMaxHP) <= *classInfo.Trait.HPTrigger {
-			users, buffString = a.determineBuffs([]*models.UserBlob{{User: user, JobClass: &classInfo, BaseStats: &userStats, BattleStats: &battleStats, MaxHP: userMaxHP}}, adventureLog, globals.REACTIVETRAIT)
+
+		if users[0].JobClass.Trait != nil {
+			users[0].MaxHP = userMaxHP
+			users[0].CurrentHP = currentHP
+			users, buffString = a.Battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
 			adventureLog = append(adventureLog, buffString)
-			user = users[0].User
 			battleStats = *users[0].BattleStats
 			userMaxHP = int(battleStats.HP)
 		}
 		if len(summons) > 0 {
-			decreaseSummonLog, newSummons := a.decreaseSummonDuration(user.Name, summons)
+			decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(users[0].User.Name, summons)
 			adventureLog = append(adventureLog, decreaseSummonLog)
 			summons = newSummons
 		}
 		adventureLog = append(adventureLog)
-		userHeal := int(float64(userStats.HP) * battleStats.Recovery)
+		userHeal := int(float64(users[0].BattleStats.HP) * battleStats.Recovery)
 		if battleStats.Recovery > 0.0 && currentHP != int(battleStats.HP) {
 			healLogs := ""
 			if userHeal+currentHP > int(battleStats.HP) {
@@ -2057,16 +2115,16 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 			} else {
 				currentHP += userHeal
 			}
-			healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.Name, userHeal)
-			healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.Name, currentHP, userMaxHP)
+			healLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", users[0].User.Name, userHeal)
+			healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", users[0].User.Name, currentHP, userMaxHP)
 			adventureLog = append(adventureLog, fmt.Sprintf("%s", healLogs))
 		}
 
-		if monster.Stats.Recovery > 0.0 {
+		if monster.Monster.Stats.Recovery > 0.0 {
 			healLogs := ""
-			monsterHeal := int(monster.Stats.HP * monster.Stats.Recovery)
-			if monsterHeal+monsterHP > int(monster.Stats.HP) {
-				monsterHP = int(monster.Stats.HP)
+			monsterHeal := int(monster.Monster.Stats.HP * monster.Monster.Stats.Recovery)
+			if monsterHeal+monsterHP > int(monster.Monster.Stats.HP) {
+				monsterHP = int(monster.Monster.Stats.HP)
 			} else {
 				monsterHP += monsterHeal
 			}
@@ -2076,15 +2134,15 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		}
 
 	}
-	user.Buffs = nil
+	users[0].Buffs = nil
 	levelCap, err := a.levels.ReadDocument("levelCap")
 	if err != nil {
 		a.log.Errorf("error retrieving current levelCap: %v", err)
 		return nil, err
 	}
-	if battleWin && levelCap.Value > user.ClassMap[user.CurrentClass].Level {
-		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", user.Name))
-		userClassInfo := *user.ClassMap[user.CurrentClass]
+	if battleWin && levelCap.Value > users[0].User.ClassMap[users[0].User.CurrentClass].Level {
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", users[0].User.Name))
+		userClassInfo := *users[0].User.ClassMap[users[0].User.CurrentClass]
 		expGainRate, err := a.GetExpGainRate("exp")
 		if err != nil {
 			return nil, err
@@ -2092,60 +2150,60 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 		monsterExp := int64(monster.Exp * float64(*expGainRate))
 		userClassInfo.Exp += monsterExp
 		monsterEly := int64(monster.Ely * float64(*expGainRate))
-		*user.Ely += monsterEly
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", user.Name, utils.String(monsterExp), utils.String(monsterEly)))
-		newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, user, levelCap.Value)
+		*users[0].User.Ely += monsterEly
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", users[0].User.Name, utils.String(monsterExp), utils.String(monsterEly)))
+		newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, users[0].User, levelCap.Value)
 		if err != nil {
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
 		}
 		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1)
 		if item != nil {
-			if user.Inventory.Equipment == nil {
-				user.Inventory.Equipment = make(map[string]int)
-				user.Inventory.Event = make(map[string]int)
-				user.Inventory.Consume = make(map[string]int)
+			if users[0].User.Inventory.Equipment == nil {
+				users[0].User.Inventory.Equipment = make(map[string]int)
+				users[0].User.Inventory.Event = make(map[string]int)
+				users[0].User.Inventory.Consume = make(map[string]int)
 			}
-			if user.Inventory.Equipment[item.Name] == 0 && len(user.Inventory.Equipment) >= 25 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", user.Name))
+			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 25 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", users[0].User.Name))
 			} else {
-				newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
-				user.Inventory.Equipment[item.Name]++
+				newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", users[0].User.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+				users[0].User.Inventory.Equipment[item.Name]++
 			}
 		}
-		user.ClassMap[user.CurrentClass] = &newUserClassInfo
+		users[0].User.ClassMap[users[0].User.CurrentClass] = &newUserClassInfo
 		adventureLog = newAdventureLog
-	} else if battleWin && levelCap.Value == user.ClassMap[user.CurrentClass].Level {
-		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", user.Name))
-		userClassInfo := *user.ClassMap[user.CurrentClass]
+	} else if battleWin && levelCap.Value == users[0].User.ClassMap[users[0].User.CurrentClass].Level {
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", users[0].User.Name))
+		userClassInfo := *users[0].User.ClassMap[users[0].User.CurrentClass]
 		expGainRate, err := a.GetExpGainRate("exp")
 		if err != nil {
 			return nil, err
 		}
 		monsterEly := int64(monster.Ely * float64(*expGainRate))
-		*user.Ely += monsterEly
-		user.ClassMap[user.CurrentClass] = &userClassInfo
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", user.Name, levelCap.Value))
+		*users[0].User.Ely += monsterEly
+		users[0].User.ClassMap[users[0].User.CurrentClass] = &userClassInfo
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", users[0].User.Name, levelCap.Value))
 		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1)
 		if item != nil {
-			if user.Inventory.Equipment == nil {
-				user.Inventory.Equipment = make(map[string]int)
-				user.Inventory.Event = make(map[string]int)
-				user.Inventory.Consume = make(map[string]int)
+			if users[0].User.Inventory.Equipment == nil {
+				users[0].User.Inventory.Equipment = make(map[string]int)
+				users[0].User.Inventory.Event = make(map[string]int)
+				users[0].User.Inventory.Consume = make(map[string]int)
 			}
-			if user.Inventory.Equipment[item.Name] == 0 && len(user.Inventory.Equipment) >= 25 {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", user.Name))
+			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 25 {
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", users[0].User.Name))
 			} else {
-				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", user.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
-				user.Inventory.Equipment[item.Name]++
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", users[0].User.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+				users[0].User.Inventory.Equipment[item.Name]++
 			}
 		}
 	} else {
-		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", user.Name))
+		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", users[0].User.Name))
 	}
-	user.LastActionTime = time.Now()
+	users[0].User.LastActionTime = time.Now()
 	//TODO: DISABLE WHEN RUNNING LOCAL
-	_, err = a.users.UpdateDocument(user.ID, user)
+	_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
 	if err != nil {
 		a.log.Errorf("failed to update user doc with error: %v", err)
 		return adventureLog, nil
@@ -2177,7 +2235,7 @@ func (a *adventure) partyBattleLog(users []*models.UserBlob, encounteredMonsters
 		monsterNames += encounteredMonsters[0].Name
 	}
 	adventureLog = append(adventureLog, fmt.Sprintf("__**The Party**__ has encountered a __**%s**__", monsterNames))
-	users, buffString := a.determineBuffs(users, adventureLog, globals.BATTLESTARTTRAIT)
+	users, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.BATTLESTARTTRAIT, true)
 	adventureLog = append(adventureLog, buffString)
 combat:
 	for a.checkGroupDeaths(users, encounteredMonsters) {
@@ -2190,16 +2248,16 @@ combat:
 				summonChance := rand.Float64()
 
 				if summonChance <= *user.JobClass.Trait.ActivationRate {
-					summonLogs, newSummons := a.generateSummons(user.User.Name, user.Summons, *user.JobClass.Trait.Summon, *user.BattleStats)
+					summonLogs, newSummons := a.Battle.GenerateSummons(user.User.Name, user.Summons, *user.JobClass.Trait.Summon, *user.BattleStats)
 					adventureLog = append(adventureLog, summonLogs)
 					user.Summons = newSummons
 				}
 			}
-			userLog, damage, statusAilment := a.damage.DetermineHit(randGenerator, user.User.Name, encounteredMonsters[0].Name, *user.BattleStats, *encounteredMonsters[0].StatModifier, &user.Weapon, user.JobClass, &user.UserLevel, false)
+			userLog, damage, statusAilment := a.Battle.DetermineHit(randGenerator, user.User.Name, encounteredMonsters[0].Name, *user.BattleStats, *encounteredMonsters[0].BattleStats, &user.Weapon, user.JobClass, &user.UserLevel, false, user.HitCount)
 			userLogs += userLog + "\n"
 			if len(user.Summons) > 0 {
 				for i, summon := range user.Summons {
-					summonLogs, summonDamage, _ := a.damage.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), encounteredMonsters[0].Name, summon.StatModifier, *encounteredMonsters[0].StatModifier, &user.Weapon, user.JobClass, &user.UserLevel, false)
+					summonLogs, summonDamage, _ := a.Battle.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), encounteredMonsters[0].Name, summon.StatModifier, *encounteredMonsters[0].BattleStats, &user.Weapon, user.JobClass, &user.UserLevel, false, user.HitCount)
 					userLogs += summonLogs + "\n"
 					damage += summonDamage
 				}
@@ -2212,10 +2270,12 @@ combat:
 				userLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", encounteredMonsters[0].Name, currentMonsterHP, monsterMaxHp)
 			}
 			if statusAilment != nil {
-				if encounteredMonsters[0].StatusAilments == nil {
-					encounteredMonsters[0].StatusAilments = make(map[string]int)
+				if encounteredMonsters[0].Debuffs == nil {
+					encounteredMonsters[0].Debuffs = make(map[string]models.CrowdControlTrait)
 				}
-				encounteredMonsters[0].StatusAilments[statusAilment.Type] = int(statusAilment.CrowdControlTime)
+				monsterDebuffLogs, newMonster := a.Battle.InflictStatusAilmentMonster(encounteredMonsters[0], *statusAilment)
+				encounteredMonsters[0] = newMonster
+				userLogs += monsterDebuffLogs
 			}
 			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.AFTERATTACKTRAIT && user.JobClass.Trait.ActivationRate != nil {
 				activationChance := rand.Float64()
@@ -2236,11 +2296,11 @@ combat:
 				}
 			}
 			encounteredMonsters[0].CurrentHP = int32(currentMonsterHP)
-			debuffLogs, changedUser := a.decreaseBuffDuration(user)
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
 			if changedUser != nil {
 				users[i] = changedUser
 			}
-			userLogs += debuffLogs
+			userLogs += buffLogs
 			if encounteredMonsters[0].CurrentHP <= 0 {
 				userLogs += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", user.User.Name, encounteredMonsters[0].Name)
 				copy(encounteredMonsters[0:], encounteredMonsters[0+1:]) // Shift a[i+1:] left one index.
@@ -2253,6 +2313,9 @@ combat:
 				break combat
 			}
 		}
+		buffedUsers, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
+		users = buffedUsers
+		userLogs += buffString
 		var aliveMonsters []*models.MonsterBlob
 		adventureLog = append(adventureLog, fmt.Sprintf("%s", userLogs))
 		enemiesLog := ""
@@ -2261,18 +2324,24 @@ combat:
 		}
 		monsterDied := false
 		for i, monster := range encounteredMonsters {
-			if monster.CurrentHP > 0 && monster.StatusAilments != nil {
-				for ailment, duration := range monster.StatusAilments {
-					if ailment == "poison" || ailment == "bleed" {
+			if monster.CurrentHP > 0 && monster.Debuffs != nil {
+				for ailment, debuff := range monster.Debuffs {
+					if ailment == "poison" || ailment == "bleed" || ailment == "burn" {
 						damageOvertime := int32(0)
-						if ailment == "poison" {
-							damageOvertime = int32(float64(monster.StatModifier.HP) * 0.05)
-						} else if ailment == "bleed" {
-							damageOvertime = int32(float64(monster.CurrentHP) * 0.10)
+						switch ailment {
+						case "poison":
+							damageOvertime = int32(float64(monster.BattleStats.HP) * 0.05)
+							break
+						case "burn":
+							damageOvertime = int32(float64(monster.BattleStats.HP) * 0.025)
+							break
+						case "bleed":
+							damageOvertime = int32(float64(monster.CurrentHP) * 0.1)
+							break
 						}
 						monster.CurrentHP = int32((monster.CurrentHP-damageOvertime)+int32(math.Abs(float64(monster.CurrentHP-damageOvertime)))) / 2
 						enemyAilmentLog := ""
-						enemyAilmentLog += fmt.Sprintf("				**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", monster.Name, int(damageOvertime), ailment, monster.Name, ailment, duration)
+						enemyAilmentLog += fmt.Sprintf("				**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", monster.Name, int(damageOvertime), ailment, monster.Name, ailment, debuff.CrowdControlTime)
 						enemyAilmentLog += fmt.Sprintf("				__**%s**__'s HP: %v/%v", monster.Name, monster.CurrentHP, int(monster.StatModifier.HP))
 						aliveMonsters[i] = monster
 						if monster.CurrentHP <= 0 {
@@ -2281,9 +2350,16 @@ combat:
 						}
 						adventureLog = append(adventureLog, fmt.Sprintf("%s", enemyAilmentLog))
 					}
-					monster.StatusAilments[ailment]--
-					if monster.StatusAilments[ailment] == 0 {
-						delete(monster.StatusAilments, ailment)
+					if debuff.Bind {
+						encounteredMonsters[i].Bound = true
+					}
+
+					monsterDebuffLogs, newMonster := a.Battle.DecreaseMonsterDebuffDuration(monster)
+					if newMonster != nil {
+						monster = newMonster
+					}
+					if monsterDebuffLogs != "" {
+						adventureLog = append(adventureLog, monsterDebuffLogs)
 					}
 				}
 
@@ -2302,54 +2378,74 @@ combat:
 			break combat
 		}
 		for _, monster := range encounteredMonsters {
-			a.log.Debugf("users: %v", users)
-			targetedUser := randGenerator.Intn(len(users))
-			monsterLog, damage, _ := a.damage.DetermineHit(randGenerator, monster.Name, users[targetedUser].User.Name, *monster.StatModifier, *users[targetedUser].BaseStats, nil, users[targetedUser].JobClass, nil, false)
-			users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
-			enemiesLog += "				" + monsterLog + "\n"
-			if damage > 0 {
-				enemiesLog += fmt.Sprintf("				__**%s**__'s HP: %v/%v\n", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP)
-			}
-			if users[targetedUser].CurrentHP <= 0 {
-				if users[targetedUser].JobClass.Trait != nil && users[targetedUser].JobClass.Trait.Type == globals.DEATHTRAIT && *users[targetedUser].JobClass.Trait.UsageCount > 0 {
-					tempTargetUser := users[targetedUser]
-					buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{tempTargetUser}, adventureLog, globals.DEATHTRAIT)
-					enemiesLog += buffString
-					tempTargetUser = buffedUsers[0]
-					tempTargetUser.MaxHP = int(tempTargetUser.BattleStats.HP)
-					tempTargetUser.CurrentHP = tempTargetUser.MaxHP
-					skillUsage := *tempTargetUser.JobClass.Trait.UsageCount
-					skillUsage--
-					tempTargetUser.JobClass.Trait.UsageCount = &skillUsage
-					users[targetedUser] = tempTargetUser
-				} else {
-					enemiesLog += fmt.Sprintf("				**%s was killed by %s!**\n", users[targetedUser].User.Name, monster.Name)
-					copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
-					users[len(users)-1] = nil                          // Erase last element (write zero value).
-					users = users[:len(users)-1]
+			if !monster.Bound {
+				targetedUser := randGenerator.Intn(len(users))
+				monsterLog, damage, _ := a.Battle.DetermineHit(randGenerator, monster.Name, users[targetedUser].User.Name, *monster.StatModifier, *users[targetedUser].BattleStats, nil, users[targetedUser].JobClass, nil, false, 1)
+				users[targetedUser].CurrentHP = ((users[targetedUser].CurrentHP - int(damage)) + int(math.Abs(float64(users[targetedUser].CurrentHP-damage)))) / 2
+				enemiesLog += "				" + monsterLog + "\n"
+				if damage > 0 {
+					enemiesLog += fmt.Sprintf("				__**%s**__'s HP: %v/%v\n", users[targetedUser].User.Name, users[targetedUser].CurrentHP, users[targetedUser].MaxHP)
+					if len(users[targetedUser].Summons) > 0 {
+						var aliveSummons []models.Summons
+						for i, summon := range users[targetedUser].Summons {
+							if users[targetedUser].Summons[i].Duration == nil {
+								users[targetedUser].Summons[i].StatModifier.HP -= float64(damage)
+								enemiesLog += fmt.Sprintf("\n				 __**%s**__ has also taken **%v** damage!\n", summon.Name+" "+strconv.Itoa(i+1), int(damage))
+								if users[targetedUser].Summons[i].StatModifier.HP > 0.0 {
+									enemiesLog += fmt.Sprintf("				__**%s**__'s remaining HP: **%v**\n", summon.Name+" "+strconv.Itoa(i+1), int(users[targetedUser].Summons[i].StatModifier.HP))
+									aliveSummons = append(aliveSummons, users[targetedUser].Summons[i])
+								} else {
+									enemiesLog += fmt.Sprintf("__**%s**__'s has died!\n", summon.Name+" "+strconv.Itoa(i+1))
+								}
+							}
+						}
+						users[targetedUser].Summons = aliveSummons
+					}
 				}
-			}
-			a.log.Debugf("users: %v", users)
-			if len(users) == 0 {
-				adventureLog = append(adventureLog, fmt.Sprintf("%s", enemiesLog))
-				break combat
+				if users[targetedUser].CurrentHP <= 0 {
+					if users[targetedUser].JobClass.Trait != nil && users[targetedUser].JobClass.Trait.Type == globals.DEATHTRAIT && *users[targetedUser].JobClass.Trait.UsageCount > 0 {
+						tempTargetUser := users[targetedUser]
+						buffedUsers, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{tempTargetUser}, adventureLog, globals.DEATHTRAIT, false)
+						enemiesLog += buffString
+						tempTargetUser = buffedUsers[0]
+						tempTargetUser.MaxHP = int(tempTargetUser.BattleStats.HP)
+						tempTargetUser.CurrentHP = tempTargetUser.MaxHP
+						skillUsage := *tempTargetUser.JobClass.Trait.UsageCount
+						skillUsage--
+						tempTargetUser.JobClass.Trait.UsageCount = &skillUsage
+						users[targetedUser] = tempTargetUser
+					} else {
+						enemiesLog += fmt.Sprintf("				**%s was killed by %s!**\n", users[targetedUser].User.Name, monster.Name)
+						copy(users[targetedUser:], users[targetedUser+1:]) // Shift a[i+1:] left one index.
+						users[len(users)-1] = nil                          // Erase last element (write zero value).
+						users = users[:len(users)-1]
+					}
+				}
+				a.log.Debugf("users: %v", users)
+				if len(users) == 0 {
+					adventureLog = append(adventureLog, fmt.Sprintf("%s", enemiesLog))
+					break combat
+				}
+			} else {
+				enemiesLog += fmt.Sprintf("				**%s** can't move due to being bound!\n", monster.Name)
 			}
 		}
 		adventureLog = append(adventureLog, fmt.Sprintf("%s", enemiesLog))
 		healLogs := ""
 		for i, user := range users {
 			if len(users[i].Summons) > 0 {
-				decreaseSummonLog, newSummons := a.decreaseSummonDuration(user.User.Name, users[i].Summons)
-				healLogs += decreaseSummonLog + "\n"
+				decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(user.User.Name, users[i].Summons)
+				healLogs += decreaseSummonLog
 				users[i].Summons = newSummons
 			}
-			if user.JobClass.Trait != nil && user.JobClass.Trait.HPTrigger != nil && float64(user.CurrentHP)/float64(user.MaxHP) <= *user.JobClass.Trait.HPTrigger {
-				buffedUser, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.REACTIVETRAIT)
+			if user.JobClass.Trait != nil {
+				buffedUser, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{user}, adventureLog, globals.REACTIVETRAIT, false)
 				healLogs += buffString
 				user = buffedUser[0]
 				user.MaxHP = int(user.BattleStats.HP)
 				users[i] = user
 			}
+
 			userHeal := int(user.BaseStats.HP * user.BattleStats.Recovery)
 			if user.CurrentHP != int(user.MaxHP) && user.BattleStats.Recovery > 0.0 {
 				if userHeal+user.CurrentHP > int(user.MaxHP) {
@@ -2396,7 +2492,8 @@ combat:
 			return nil, err
 		}
 		for _, user := range users {
-			user.User.Buffs = nil
+			user.Buffs = nil
+			user.Debuffs = nil
 			userInfo := user.User
 			if levelCap.Value > user.User.ClassMap[user.User.CurrentClass].Level {
 				userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
@@ -2454,11 +2551,11 @@ combat:
 	return adventureLog, nil
 }
 
-func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster, primaryUserId string) ([]string, error) {
+func (a *adventure) bossBattleLog(users []*models.UserBlob, boss models.MonsterBlob, primaryUserId string) ([]string, error) {
 	battleWin := false
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGenerator := rand.New(randSource)
-	bossMaxHp := int(boss.Stats.HP) * len(users)
+	bossMaxHp := int(boss.Monster.Stats.HP) * len(users)
 	bossCurrentHp := bossMaxHp
 	partyBonus := 1.0
 	if len(users) > 1 {
@@ -2466,80 +2563,134 @@ func (a *adventure) bossBattleLog(users []*models.UserBlob, boss *models.Monster
 	}
 	bossHPPercentage := float64(bossCurrentHp) / float64(bossMaxHp)
 	var adventureLog []string
-	for _, skill := range *boss.Skills {
+	for _, skill := range *boss.Monster.Skills {
 		curCd := int32(0)
 		skill.CurrentCoolDown = &curCd
 	}
 
 	activeSkills := 1
 	enraged := false
-	adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BOSS ENCOUNTER------------------------**\n__**The Party**__ has encountered **%s**, __**%s**__.\n**------------------------BOSS ENCOUNTER------------------------**", boss.Name, *boss.BossTitle))
-	users, buffString := a.determineBuffs(users, adventureLog, globals.BATTLESTARTTRAIT)
+	adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BOSS ENCOUNTER------------------------**\n__**The Party**__ has encountered **%s**, __**%s**__.\n**------------------------BOSS ENCOUNTER------------------------**", boss.Name, *boss.Monster.BossTitle))
+	users, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.BATTLESTARTTRAIT, true)
 	adventureLog = append(adventureLog, buffString)
 bossBattle:
 	for len(users) != 0 && bossCurrentHp != 0 {
+		bossLogs := ""
+		bossBind := false
+		for ailment, debuff := range boss.Debuffs {
+			bossStatusAilmentLogs := ""
+			if ailment == "poison" || ailment == "bleed" || ailment == "burn" {
+				damageOvertime := 0
+				switch ailment {
+				case "poison":
+					damageOvertime = int(float64(bossMaxHp) * 0.05)
+					break
+				case "burn":
+					damageOvertime = int(float64(bossMaxHp) * 0.025)
+					break
+				case "bleed":
+					damageOvertime = int(float64(bossCurrentHp) * 0.1)
+					break
+				}
+				bossCurrentHp = int((bossCurrentHp-damageOvertime)+int(math.Abs(float64(bossCurrentHp-damageOvertime)))) / 2
+				bossStatusAilmentLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", boss.Name, int(damageOvertime), ailment, boss.Name, ailment, debuff.CrowdControlTime)
+				bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
+				bossStatusAilmentLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
+				if bossCurrentHp <= 0 {
+					bossStatusAilmentLogs += fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!\n", boss.Name)
+					adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS STATUS AILMENT TURN------------------------**\n%s**------------------------BEGIN BOSS STATUS AILMENT TURN------------------------**", bossStatusAilmentLogs))
+					battleWin = true
+					break bossBattle
+				}
+			}
+			if debuff.Bind {
+				a.log.Infof("ailment: %v", ailment)
+				bossBind = true
+			}
+			if bossStatusAilmentLogs != "" {
+				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS STATUS AILMENT TURN------------------------**\n%s**------------------------BEGIN BOSS STATUS AILMENT TURN------------------------**", bossStatusAilmentLogs))
+			}
+		}
+		bossDebuffLogs, newBoss := a.Battle.DecreaseMonsterDebuffDuration(&boss)
+		if newBoss != nil {
+			boss = *newBoss
+		}
+		if bossDebuffLogs != "" {
+			bossLogs += bossDebuffLogs
+		}
 		userLogs := ""
 		for i, user := range users {
 			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.SUMMONTRAIT && user.JobClass.Trait.ActivationRate != nil {
 				summonChance := rand.Float64()
 
 				if summonChance <= *user.JobClass.Trait.ActivationRate {
-					summonLogs, newSummons := a.generateSummons(user.User.Name, user.Summons, *user.JobClass.Trait.Summon, *user.BattleStats)
+					summonLogs, newSummons := a.Battle.GenerateSummons(user.User.Name, user.Summons, *user.JobClass.Trait.Summon, *user.BattleStats)
 					userLogs += summonLogs + "\n"
 					user.Summons = newSummons
 				}
 			}
 			damage := 0
-			var statusAilment *models.CrowdControlTrait = nil
-			if user.CrowdControlled != nil && *user.CrowdControlled != 0 && *user.CrowdControlStatus != "poison" && *user.CrowdControlStatus != "burn" && *user.CrowdControlStatus != "bleed" {
-				userLogs += fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.\n", user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
-			} else {
-				userLog, userDamage, userInflictedAilment := a.damage.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.BattleStats, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
+			var statusAilment *models.CrowdControlTrait
+
+			bound := false
+			for ailment, debuff := range user.Debuffs {
+				if debuff.Bind {
+					userLogs += fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.\n", user.User.Name, ailment, debuff.CrowdControlTime)
+					bound = true
+				}
+			}
+			if !bound {
+				userLog, userDamage, userInflictedAilment := a.Battle.DetermineHit(randGenerator, user.User.Name, boss.Name, *user.BattleStats, *boss.BattleStats, &user.Weapon, user.JobClass, &user.UserLevel, true, user.HitCount)
 				userLogs += userLog + "\n"
 				damage += userDamage
 				statusAilment = userInflictedAilment
 			}
 			if len(user.Summons) > 0 {
 				for i, summon := range user.Summons {
-					summonLog, summonDamage, _ := a.damage.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), boss.Name, summon.StatModifier, boss.Stats, &user.Weapon, user.JobClass, &user.UserLevel, true)
+					summonLog, summonDamage, _ := a.Battle.DetermineHit(randGenerator, summon.Name+" "+strconv.Itoa(i+1), boss.Name, summon.StatModifier, *boss.BattleStats, &user.Weapon, user.JobClass, &user.UserLevel, true, user.HitCount)
 					userLogs += summonLog + "\n"
 					damage += summonDamage
 				}
 			}
 			bossCurrentHp = ((int(bossCurrentHp) - int(damage)) + int(math.Abs(float64(bossCurrentHp-damage)))) / 2
-			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.AFTERATTACKTRAIT && user.JobClass.Trait.ActivationRate != nil {
-				activationChance := rand.Float64()
-				if user.JobClass.Trait.CrowdControl != nil && activationChance <= *user.JobClass.Trait.ActivationRate {
-					userLogs += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
-					if user.JobClass.Trait.CrowdControl.Type == "drain" {
-						bossCurrentHp = int(float64(bossCurrentHp) * 0.95)
-						drainHp := int(float64(users[i].MaxHP) * 0.10)
-						if users[i].CurrentHP+drainHp > users[i].MaxHP {
-							users[i].CurrentHP = users[i].MaxHP
-						} else {
-							users[i].CurrentHP += drainHp
-						}
-						userLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, drainHp)
-						userLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, users[i].CurrentHP, user.MaxHP)
-					}
-				}
-			}
 			bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
 			if damage > 0 {
 				userLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
-			}
-			if statusAilment != nil {
-				if boss.StatusAilments == nil {
-					boss.StatusAilments = make(map[string]int)
+				if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.AFTERATTACKTRAIT && user.JobClass.Trait.ActivationRate != nil {
+					activationChance := rand.Float64()
+					if user.JobClass.Trait.CrowdControl != nil && activationChance <= *user.JobClass.Trait.ActivationRate {
+						userLogs += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
+						if user.JobClass.Trait.CrowdControl.Type == "drain" {
+							bossCurrentHp = int(float64(bossCurrentHp) - float64(bossCurrentHp)*0.075)
+							drainHp := int(float64(users[i].MaxHP) * 0.075)
+							if users[i].CurrentHP+drainHp > users[i].MaxHP {
+								users[i].CurrentHP = users[i].MaxHP
+							} else {
+								users[i].CurrentHP += drainHp
+							}
+							bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
+							userLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
+							userLogs += fmt.Sprintf("__**%s**__ ***HEALED*** for %v HP.\n", user.User.Name, drainHp)
+							userLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v!\n", user.User.Name, users[i].CurrentHP, user.MaxHP)
+						}
+					}
 				}
-				boss.StatusAilments[statusAilment.Type] = int(statusAilment.CrowdControlTime)
 			}
 
-			debuffLogs, changedUser := a.decreaseBuffDuration(user)
+			if statusAilment != nil {
+				debuffLogs, newBoss := a.Battle.InflictStatusAilmentMonster(&boss, *statusAilment)
+				boss = *newBoss
+				userLogs += debuffLogs
+				if statusAilment.Bind {
+					bossBind = true
+				}
+			}
+
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
 			if changedUser != nil {
 				users[i] = changedUser
 			}
-			userLogs += debuffLogs
+			userLogs += buffLogs
 			if bossCurrentHp <= 0 {
 				userLogs += fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!\n", boss.Name)
 				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
@@ -2547,8 +2698,11 @@ bossBattle:
 				break bossBattle
 			}
 		}
+		buffedUsers, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
+		users = buffedUsers
+		userLogs += buffString
 		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
-		phase, newActiveSkills := a.checkPhaseStatus(bossHPPercentage, boss, activeSkills)
+		phase, newActiveSkills := a.checkPhaseStatus(bossHPPercentage, &boss.Monster, activeSkills)
 		if phase != "" && newActiveSkills != activeSkills {
 			activeSkills = newActiveSkills
 			enragedText := ""
@@ -2559,35 +2713,9 @@ bossBattle:
 			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------PHASE %v------------------------**\n%s\n%s**------------------------PHASE %v------------------------**", activeSkills, phase, enragedText, activeSkills))
 		}
 		active := randGenerator.Float64()
-		bossLogs := ""
-		for ailment, duration := range boss.StatusAilments {
-			if ailment == "poison" || ailment == "bleed" {
-				damageOvertime := 0
-				if ailment == "poison" {
-					damageOvertime = int(float64(bossMaxHp) * 0.01)
 
-				} else if ailment == "bleed" {
-					damageOvertime = int(float64(bossCurrentHp) * 0.04)
-				}
-				bossCurrentHp = int((bossCurrentHp-damageOvertime)+int(math.Abs(float64(bossCurrentHp-damageOvertime)))) / 2
-				bossLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", boss.Name, int(damageOvertime), ailment, boss.Name, ailment, duration)
-				bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
-				bossLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
-				if bossCurrentHp <= 0 {
-					bossLogs += fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!\n", boss.Name)
-					adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS ATTACK TURN------------------------**\n%s**------------------------END BOSS ATTACK TURN------------------------**", bossLogs))
-					battleWin = true
-					break bossBattle
-				}
-			}
-			boss.StatusAilments[ailment]--
-			if boss.StatusAilments[ailment] == 0 {
-				delete(boss.StatusAilments, ailment)
-			}
-		}
-
-		if active > *boss.IdleTime || enraged {
-			skills := *boss.Skills
+		if !bossBind && (active > *boss.Monster.IdleTime || enraged) {
+			skills := *boss.Monster.Skills
 			var availableSkills []*models.BossSkill
 			for i := 0; i < activeSkills; i++ {
 				if *skills[i].CurrentCoolDown == 0 {
@@ -2612,7 +2740,7 @@ bossBattle:
 			}
 			if skill != nil && skill.AoE {
 				for i, user := range users {
-					updatedUser, bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *user, boss, skill)
+					updatedUser, bossDamageLog, damage := a.Battle.DetermineBossDamage(randGenerator, *user, &boss.Monster, skill)
 					updatedUser.CurrentHP = ((updatedUser.CurrentHP - int(damage)) + int(math.Abs(float64(updatedUser.CurrentHP-damage)))) / 2
 					bossLogs += bossDamageLog + "\n"
 					if damage > 0 {
@@ -2621,7 +2749,7 @@ bossBattle:
 
 					if updatedUser.CurrentHP <= 0 {
 						if updatedUser.JobClass.Trait != nil && updatedUser.JobClass.Trait.Type == globals.DEATHTRAIT && *updatedUser.JobClass.Trait.UsageCount > 0 {
-							buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{updatedUser}, adventureLog, globals.DEATHTRAIT)
+							buffedUsers, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{updatedUser}, adventureLog, globals.DEATHTRAIT, false)
 							updatedUser = buffedUsers[0]
 							bossLogs += buffString
 							updatedUser.MaxHP = int(updatedUser.BattleStats.HP)
@@ -2643,7 +2771,7 @@ bossBattle:
 				}
 			} else {
 				targetedUser := randGenerator.Intn(len(users))
-				updatedUser, bossDamageLog, damage := a.damage.DetermineBossDamage(randGenerator, *users[targetedUser], boss, skill)
+				updatedUser, bossDamageLog, damage := a.Battle.DetermineBossDamage(randGenerator, *users[targetedUser], &boss.Monster, skill)
 				updatedUser.CurrentHP = ((updatedUser.CurrentHP - int(damage)) + int(math.Abs(float64(updatedUser.CurrentHP-damage)))) / 2
 				bossLogs += bossDamageLog + "\n"
 				if damage > 0 {
@@ -2651,7 +2779,7 @@ bossBattle:
 				}
 				if updatedUser.CurrentHP <= 0 {
 					if updatedUser.JobClass.Trait != nil && updatedUser.JobClass.Trait.Type == globals.DEATHTRAIT && *updatedUser.JobClass.Trait.UsageCount > 0 {
-						buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{updatedUser}, adventureLog, globals.DEATHTRAIT)
+						buffedUsers, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{updatedUser}, adventureLog, globals.DEATHTRAIT, false)
 						updatedUser = buffedUsers[0]
 						bossLogs += buffString
 						updatedUser.MaxHP = int(updatedUser.BattleStats.HP)
@@ -2683,9 +2811,9 @@ bossBattle:
 					skill.CurrentCoolDown = &curCoolDown
 				}
 			}
-			boss.Skills = &skills
+			boss.Monster.Skills = &skills
 		} else {
-			bossLogs += *boss.IdlePhrase + "\n"
+			bossLogs += *boss.Monster.IdlePhrase + "\n"
 		}
 		adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS ATTACK TURN------------------------**\n%s**------------------------END BOSS ATTACK TURN------------------------**", bossLogs))
 
@@ -2696,32 +2824,41 @@ bossBattle:
 		}
 		playerDied := false
 		for i, user := range users {
-			if user.CurrentHP > 0 && user.CrowdControlled != nil && *user.CrowdControlled != 0 && (*user.CrowdControlStatus == "poison" || *user.CrowdControlStatus == "bleed" || *user.CrowdControlStatus == "burn") {
-				damageOvertime := 0
-				if *user.CrowdControlStatus == "bleed" {
-					damageOvertime = int(float64(user.CurrentHP) * 0.10)
-				} else if *user.CrowdControlStatus == "poison" || *user.CrowdControlStatus == "burn" {
-					damageOvertime = int(float64(user.MaxHP) * 0.075)
-				}
-				user.CurrentHP = ((user.CurrentHP - int(damageOvertime)) + int(math.Abs(float64(user.CurrentHP-damageOvertime)))) / 2
-				healLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", user.User.Name, damageOvertime, *user.CrowdControlStatus, user.User.Name, *user.CrowdControlStatus, *user.CrowdControlled)
-				healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", user.User.Name, user.CurrentHP, user.MaxHP)
-				alivePlayers[i] = user
-				if user.CurrentHP <= 0 {
-					if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.DEATHTRAIT && *user.JobClass.Trait.UsageCount > 0 {
-						buffedUsers, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.DEATHTRAIT)
-						user = buffedUsers[0]
-						healLogs += buffString
-						user.MaxHP = int(user.BattleStats.HP)
-						user.CurrentHP = user.MaxHP
-						skillUsage := *user.JobClass.Trait.UsageCount
-						skillUsage--
-						user.JobClass.Trait.UsageCount = &skillUsage
-					} else {
-						healLogs += fmt.Sprintf("**%s was killed by %s!**\n", user.User.Name, boss.Name)
-						playerDied = true
+			for ailment, debuff := range user.Debuffs {
+				if user.CurrentHP > 0 && debuff.CrowdControlTime != int32(0) && (debuff.Type == "poison" || debuff.Type == "blood" || debuff.Type == "burn") {
+					damageOvertime := 0
+					if debuff.Type == "bleed" {
+						damageOvertime = int(float64(user.CurrentHP) * 0.10)
+					} else if debuff.Type == "poison" || debuff.Type == "burn" {
+						damageOvertime = int(float64(user.MaxHP) * 0.075)
 					}
+					user.CurrentHP = ((user.CurrentHP - int(damageOvertime)) + int(math.Abs(float64(user.CurrentHP-damageOvertime)))) / 2
+					healLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", user.User.Name, damageOvertime, ailment, user.User.Name, ailment, debuff.CrowdControlTime)
+					healLogs += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", user.User.Name, user.CurrentHP, user.MaxHP)
 					alivePlayers[i] = user
+					if user.CurrentHP <= 0 {
+						if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.DEATHTRAIT && *user.JobClass.Trait.UsageCount > 0 {
+							buffedUsers, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{user}, adventureLog, globals.DEATHTRAIT, false)
+							user = buffedUsers[0]
+							healLogs += buffString
+							user.MaxHP = int(user.BattleStats.HP)
+							user.CurrentHP = user.MaxHP
+							skillUsage := *user.JobClass.Trait.UsageCount
+							skillUsage--
+							user.JobClass.Trait.UsageCount = &skillUsage
+						} else {
+							healLogs += fmt.Sprintf("**%s was killed by %s!**\n", user.User.Name, boss.Name)
+							playerDied = true
+						}
+						alivePlayers[i] = user
+					}
+				}
+				buffLogs, changedUser := a.Battle.DecreaseUserDebuffDuration(users[0])
+				if changedUser != nil {
+					user.BattleStats = changedUser.BattleStats
+				}
+				if buffLogs != "" {
+					healLogs += buffLogs
 				}
 			}
 		}
@@ -2734,21 +2871,13 @@ bossBattle:
 			}
 		}
 		for i, user := range users {
-			if user.CrowdControlled != nil && *user.CrowdControlled > 0 {
-				crowdControlled := *user.CrowdControlled
-				crowdControlled--
-				user.CrowdControlled = &crowdControlled
-				if *user.CrowdControlled == 0 {
-					user.CrowdControlStatus = nil
-				}
-			}
 			if len(users[i].Summons) > 0 {
-				decreaseSummonLog, newSummons := a.decreaseSummonDuration(user.User.Name, users[i].Summons)
-				healLogs += decreaseSummonLog + "\n"
+				decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(user.User.Name, users[i].Summons)
+				healLogs += decreaseSummonLog
 				users[i].Summons = newSummons
 			}
-			if user.JobClass.Trait != nil && user.JobClass.Trait.HPTrigger != nil && float64(user.CurrentHP)/float64(user.MaxHP) <= *user.JobClass.Trait.HPTrigger {
-				buffedUser, buffString := a.determineBuffs([]*models.UserBlob{user}, adventureLog, globals.REACTIVETRAIT)
+			if user.JobClass.Trait != nil {
+				buffedUser, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{user}, adventureLog, globals.REACTIVETRAIT, false)
 				healLogs += buffString
 				user = buffedUser[0]
 				user.MaxHP = int(user.BattleStats.HP)
@@ -2784,11 +2913,12 @@ bossBattle:
 			return nil, err
 		}
 		for _, winningUsers := range users {
-			winningUsers.User.Buffs = nil
+			winningUsers.Buffs = nil
+			winningUsers.Debuffs = nil
 			userInfo := winningUsers.User
 			if levelCap.Value > winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
-				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
+				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, boss.Monster, adventureLog)
 				bossExp := int64(float64(boss.Exp*float64(*expGainRate)) * partyBonus)
 				userClassInfo.Exp += bossExp
 				oldEly := *winningUsers.User.Ely
@@ -2806,7 +2936,7 @@ bossBattle:
 				adventureLog = newAdventureLog
 			} else if battleWin && levelCap.Value == winningUsers.User.ClassMap[winningUsers.User.CurrentClass].Level {
 				userClassInfo := *winningUsers.User.ClassMap[winningUsers.User.CurrentClass]
-				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, *boss, adventureLog)
+				userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, boss.Monster, adventureLog)
 				oldEly := *winningUsers.User.Ely
 				bossEly := int64(float64(boss.Ely*float64(*expGainRate)) * partyBonus)
 				oldEly += bossEly
@@ -2815,7 +2945,7 @@ bossBattle:
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
 			}
 			userInfo.LastBossActionTime = time.Now()
-			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.DropRange, *randGenerator, &boss.Name, len(users))
+			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.Monster.DropRange, *randGenerator, &boss.Name, len(users))
 			if item != nil {
 				if userInfo.Inventory.Equipment == nil {
 					userInfo.Inventory.Equipment = make(map[string]int)
@@ -2861,68 +2991,6 @@ func (a *adventure) checkPhaseStatus(bossPercent float64, boss *models.Monster, 
 /*
 	Applies buffs to players in a party and returns that party.
 */
-func (a *adventure) determineBuffs(users []*models.UserBlob, adventureLog []string, buffType globals.TraitType) ([]*models.UserBlob, string) {
-	buffString := ""
-	buffedUsers := users
-	for i, user := range users {
-		if user.JobClass.Trait != nil && user.JobClass.Trait.Type == buffType && user.JobClass.Trait.Battle != nil {
-			if user.JobClass.Trait.Battle.AoE == true && len(users) > 1 {
-				buffString += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
-
-				for j, buffedUser := range buffedUsers {
-					if buffedUser.User.Buffs[user.JobClass.Trait.Name] == nil {
-						diffStats := buffedUsers[j].BaseStats.AddBuffStats(user.JobClass.Trait.Battle.Buff.StatModifier)
-						buffedUsers[j].BattleStats.AddStatModifier(diffStats)
-						buffedUsers[j].User.Buffs[user.JobClass.Trait.Name] = &models.Buff{
-							StatModifier: diffStats,
-							Duration:     user.JobClass.Trait.Battle.Buff.Duration,
-						}
-						if buffedUsers[j].MaxHP < int(buffedUsers[j].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
-							buffedUsers[j].MaxHP = int(buffedUsers[j].BattleStats.HP)
-							buffedUsers[j].CurrentHP = buffedUsers[j].MaxHP
-						}
-					}
-				}
-			} else {
-				if buffedUsers[i].User.Buffs[user.JobClass.Trait.Name] == nil {
-					buffString += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
-					diffStats := buffedUsers[i].BaseStats.AddBuffStats(user.JobClass.Trait.Battle.Buff.StatModifier)
-					buffedUsers[i].BattleStats.AddStatModifier(diffStats)
-					buffedUsers[i].User.Buffs[user.JobClass.Trait.Name] = &models.Buff{
-						StatModifier: diffStats,
-						Duration:     user.JobClass.Trait.Battle.Buff.Duration,
-					}
-					if buffedUsers[i].MaxHP < int(buffedUsers[i].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
-						buffedUsers[i].MaxHP = int(buffedUsers[i].BattleStats.HP)
-						buffedUsers[i].CurrentHP = buffedUsers[i].MaxHP
-					}
-				}
-
-			}
-		}
-	}
-	return buffedUsers, buffString
-}
-
-func (a *adventure) decreaseBuffDuration(user *models.UserBlob) (string, *models.UserBlob) {
-	removedBuffs := ""
-	for name, buff := range user.User.Buffs {
-		duration := *user.User.Buffs[name].Duration
-		duration--
-		user.User.Buffs[name].Duration = &duration
-		if *user.User.Buffs[name].Duration <= 0 {
-			user.BattleStats.SubtractStatModifier(buff.StatModifier)
-			user.MaxHP = int(user.BattleStats.HP)
-			removedBuffs += fmt.Sprintf("The effects of __**%s**__ have expired for __***%s***__\n", name, user.User.Name)
-			delete(user.User.Buffs, name)
-
-		}
-	}
-	if removedBuffs == "" {
-		return "", nil
-	}
-	return removedBuffs, user
-}
 
 func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonsters []*models.MonsterBlob) bool {
 	playersAlive := len(users)
@@ -2944,42 +3012,6 @@ func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonste
 		}
 	}
 	return true
-}
-
-func (a *adventure) generateSummons(user string, summons []models.Summons, summonTrait models.SummonTrait, stats models.StatModifier) (string, []models.Summons) {
-	newSummon := models.Summons{
-		Name:         summonTrait.Summons.Name,
-		StatModifier: a.getSummonStats(stats, summonTrait.Summons.StatModifier),
-		Duration:     summonTrait.Summons.Duration,
-	}
-	for i := int32(0); i < summonTrait.Count; i++ {
-		summons = append(summons, newSummon)
-	}
-	return fmt.Sprintf("__**%s**__ summoned ***%s***!", user, newSummon.Name), summons
-}
-
-func (a *adventure) decreaseSummonDuration(user string, summons []models.Summons) (string, []models.Summons) {
-	summonLogs := ""
-	var aliveSummons []models.Summons
-	for i, _ := range summons {
-		if summons[i].Duration != nil {
-			newDuration := *summons[i].Duration
-			newDuration--
-			summons[i].Duration = &newDuration
-			if *summons[i].Duration == 0 {
-				summonLogs += fmt.Sprintf("__**%s %d**__ has faded out of existence!\n", summons[i].Name, i+1)
-			} else {
-				summonLogs += fmt.Sprintf("__**%s %d**__ will remain active for %d more turn(s)!\n", summons[i].Name, i+1, *summons[i].Duration)
-				aliveSummons = append(aliveSummons, summons[i])
-			}
-		}
-	}
-	return summonLogs, aliveSummons
-}
-
-func (a *adventure) getSummonStats(user, summon models.StatModifier) models.StatModifier {
-	summon.AmplifyStatModifier(user)
-	return summon
 }
 
 func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int32) (models.ClassInfo, []string, error) {
@@ -3144,7 +3176,6 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 	bossAccuracy := 0.0
 	bossSkillDmg := 0.0
 	bossTdd := 0.0
-	a.log.Debugf("user bossbonuses: %v", user.ClassMap[user.CurrentClass].BossBonuses)
 	if user.ClassMap[user.CurrentClass].BossBonuses != nil && len(user.ClassMap[user.CurrentClass].BossBonuses) > 0 {
 		for _, bonus := range user.ClassMap[user.CurrentClass].BossBonuses {
 			bossMaxDps += bonus.MaxDPS

@@ -15,7 +15,7 @@ type Resolver struct {
 	Services struct {
 		Adventure services.Adventure
 		Manage    services.Manage
-		Damage    services.Damage
+		Damage    services.Battle
 	}
 	Log loggo.Logger
 }
