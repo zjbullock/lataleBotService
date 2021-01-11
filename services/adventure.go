@@ -1991,16 +1991,6 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 				monster.Bound = true
 			}
 		}
-		if len(users[0].Buffs) > 0 {
-			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(users[0])
-			if changedUser != nil {
-				users[0] = changedUser
-				battleStats = *users[0].BattleStats
-			}
-			if buffLogs != "" {
-				userLog += buffLogs
-			}
-		}
 		buffedUsers, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
 		users[0] = buffedUsers[0]
 		battleStats = *buffedUsers[0].BattleStats
@@ -2092,7 +2082,16 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			adventureLog = append(adventureLog, fmt.Sprintf("				**%s** can't move due to being bound!\n", monster.Name))
 			monster.Bound = false
 		}
-
+		if len(users[0].Buffs) > 0 {
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(users[0])
+			if changedUser != nil {
+				users[0] = changedUser
+				battleStats = *users[0].BattleStats
+			}
+			if buffLogs != "" {
+				userLog += buffLogs
+			}
+		}
 		if users[0].JobClass.Trait != nil {
 			users[0].MaxHP = userMaxHP
 			users[0].CurrentHP = currentHP
@@ -2296,11 +2295,6 @@ combat:
 				}
 			}
 			encounteredMonsters[0].CurrentHP = int32(currentMonsterHP)
-			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
-			if changedUser != nil {
-				users[i] = changedUser
-			}
-			userLogs += buffLogs
 			if encounteredMonsters[0].CurrentHP <= 0 {
 				userLogs += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", user.User.Name, encounteredMonsters[0].Name)
 				copy(encounteredMonsters[0:], encounteredMonsters[0+1:]) // Shift a[i+1:] left one index.
@@ -2433,6 +2427,11 @@ combat:
 		adventureLog = append(adventureLog, fmt.Sprintf("%s", enemiesLog))
 		healLogs := ""
 		for i, user := range users {
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
+			if changedUser != nil {
+				users[i] = changedUser
+			}
+			userLogs += buffLogs
 			if len(users[i].Summons) > 0 {
 				decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(user.User.Name, users[i].Summons)
 				healLogs += decreaseSummonLog
@@ -2603,6 +2602,13 @@ bossBattle:
 					break bossBattle
 				}
 			}
+			bossDebuffLogs, newBoss := a.Battle.DecreaseMonsterDebuffDuration(&boss)
+			if newBoss != nil {
+				boss = *newBoss
+			}
+			if bossDebuffLogs != "" {
+				bossStatusAilmentLogs += bossDebuffLogs
+			}
 			if debuff.Bind {
 				a.log.Infof("ailment: %v", ailment)
 				bossBind = true
@@ -2610,13 +2616,6 @@ bossBattle:
 			if bossStatusAilmentLogs != "" {
 				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN BOSS STATUS AILMENT TURN------------------------**\n%s**------------------------BEGIN BOSS STATUS AILMENT TURN------------------------**", bossStatusAilmentLogs))
 			}
-		}
-		bossDebuffLogs, newBoss := a.Battle.DecreaseMonsterDebuffDuration(&boss)
-		if newBoss != nil {
-			boss = *newBoss
-		}
-		if bossDebuffLogs != "" {
-			bossLogs += bossDebuffLogs
 		}
 		userLogs := ""
 		for i, user := range users {
@@ -2686,11 +2685,6 @@ bossBattle:
 				}
 			}
 
-			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
-			if changedUser != nil {
-				users[i] = changedUser
-			}
-			userLogs += buffLogs
 			if bossCurrentHp <= 0 {
 				userLogs += fmt.Sprintf("__**The Party**__ **has successfully defeated ** __**%s**__!\n", boss.Name)
 				adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY ATTACK TURN------------------------**\n%s**------------------------END PARTY ATTACK TURN------------------------**", userLogs))
@@ -2853,13 +2847,13 @@ bossBattle:
 						alivePlayers[i] = user
 					}
 				}
-				buffLogs, changedUser := a.Battle.DecreaseUserDebuffDuration(users[0])
-				if changedUser != nil {
-					user.BattleStats = changedUser.BattleStats
-				}
-				if buffLogs != "" {
-					healLogs += buffLogs
-				}
+			}
+			buffLogs, changedUser := a.Battle.DecreaseUserDebuffDuration(users[i])
+			if changedUser != nil {
+				users[i].BattleStats = changedUser.BattleStats
+			}
+			if buffLogs != "" {
+				healLogs += buffLogs
 			}
 		}
 		if playerDied {
@@ -2871,13 +2865,18 @@ bossBattle:
 			}
 		}
 		for i, user := range users {
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
+			if changedUser != nil {
+				users[i] = changedUser
+			}
+			healLogs += buffLogs
 			if len(users[i].Summons) > 0 {
 				decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(user.User.Name, users[i].Summons)
 				healLogs += decreaseSummonLog
 				users[i].Summons = newSummons
 			}
-			if user.JobClass.Trait != nil {
-				buffedUser, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{user}, adventureLog, globals.REACTIVETRAIT, false)
+			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.HEALTRAIT {
+				buffedUser, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{user}, adventureLog, globals.HEALTRAIT, false)
 				healLogs += buffString
 				user = buffedUser[0]
 				user.MaxHP = int(user.BattleStats.HP)

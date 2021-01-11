@@ -170,6 +170,8 @@ func (b *battle) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 				} else {
 					damageLog += fmt.Sprintf("__**%s**__'s has died!\n", summon.Name+" "+strconv.Itoa(i+1))
 				}
+			} else {
+				aliveSummons = append(aliveSummons, updatedUser.Summons[i])
 			}
 		}
 		updatedUser.Summons = aliveSummons
@@ -214,7 +216,7 @@ func (b *battle) DetermineTraitActivations(users []*models.UserBlob, adventureLo
 	for i, user := range users {
 
 		if user.JobClass.Trait != nil && user.JobClass.Trait.Type == buffType &&
-			(user.JobClass.Trait.ActivationRate == nil || (user.JobClass.Trait.ActivationRate != nil && *user.JobClass.Trait.ActivationRate > rand.Float64())) &&
+			(user.JobClass.Trait.ActivationRate == nil || (user.JobClass.Trait.ActivationRate != nil && *user.JobClass.Trait.ActivationRate >= rand.Float64())) &&
 			(user.JobClass.Trait.HPTrigger == nil || (user.JobClass.Trait.HPTrigger != nil && float64(user.CurrentHP)/float64(user.MaxHP) <= *user.JobClass.Trait.HPTrigger)) {
 			if user.JobClass.Trait.Battle != nil {
 				if user.JobClass.Trait.Battle.AoE == true && len(users) > 1 {
@@ -342,15 +344,16 @@ func (b *battle) InflictStatusAilmentMonster(monster *models.MonsterBlob, status
 		diffStats := monster.BattleStats.AddBuffStats(*statusAilment.Debuff)
 		monster.BattleStats.SubtractStatModifier(diffStats)
 		debuffStats = &diffStats
-	}
 
-	monster.Debuffs[statusAilment.Type] = models.CrowdControlTrait{
-		Type:             statusAilment.Type,
-		Debuff:           debuffStats,
-		Bind:             statusAilment.Bind,
-		CrowdControlTime: statusAilment.CrowdControlTime,
+		monster.Debuffs[statusAilment.Type] = models.CrowdControlTrait{
+			Type:             statusAilment.Type,
+			Debuff:           debuffStats,
+			Bind:             statusAilment.Bind,
+			CrowdControlTime: statusAilment.CrowdControlTime,
+		}
+		return fmt.Sprintf("__**%s**__ was inflicted with __**%s**__\n", monster.Name, statusAilment.Type), monster
 	}
-	return fmt.Sprintf("__**%s**__ was inflicted with __**%s**__\n", monster.Name, statusAilment.Type), monster
+	return "", monster
 }
 
 func (b *battle) GenerateSummons(user string, summons []models.Summons, summonTrait models.SummonTrait, stats models.StatModifier) (string, []models.Summons) {
