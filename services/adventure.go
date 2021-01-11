@@ -1915,7 +1915,6 @@ func (a *adventure) createAdventureLog(classInfo models.JobClass, user *models.U
 	userWeapon := user.ClassMap[user.CurrentClass].Equipment.Weapon.Type.WeaponType
 	var summons []models.Summons
 	jobClass := users[0].JobClass
-	a.log.Infof("JobClass: %v", jobClass.Trait.Summon)
 	for currentHP != 0 && monsterHP != 0 {
 		if jobClass.Trait != nil && jobClass.Trait.Type == globals.SUMMONTRAIT && jobClass.Trait.ActivationRate != nil {
 			summonChance := rand.Float64()
