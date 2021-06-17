@@ -2016,7 +2016,7 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 					break
 				}
 				monsterHP = (monsterHP - int(damageOvertime)) + int(math.Abs(float64(monsterHP)-damageOvertime))/2
-				userLog += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", monster.Name, int(damageOvertime), ailment, monster.Name, ailment, debuff.CrowdControlTime)
+				userLog += fmt.Sprintf("**%s lost %v HP!** due to **%s**.\n", monster.Name, int(damageOvertime), ailment)
 				userLog += fmt.Sprintf("__**%s**__'s HP: %v/%v\n", monster.Name, monsterHP, int(monster.Monster.Stats.HP))
 				if monsterHP <= 0 {
 					userLog += fmt.Sprintf("__**%s**__ **has successfully defeated the** __**%s**__!\n", users[0].User.Name, monster.Name)
@@ -2055,6 +2055,8 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 							} else {
 								monsterLog += fmt.Sprintf("__**%s**__'s has died!\n", summon.Name+" "+strconv.Itoa(i+1))
 							}
+						} else {
+							aliveSummons = append(aliveSummons, summons[i])
 						}
 					}
 					summons = aliveSummons
@@ -2096,6 +2098,8 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			users[0].MaxHP = userMaxHP
 			users[0].CurrentHP = currentHP
 			users, buffString = a.Battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
+			users, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.HEALTRAIT, false)
+
 			adventureLog = append(adventureLog, buffString)
 			battleStats = *users[0].BattleStats
 			userMaxHP = int(battleStats.HP)
@@ -2202,7 +2206,7 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 	}
 	users[0].User.LastActionTime = time.Now()
 	//TODO: DISABLE WHEN RUNNING LOCAL
-	_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
+	//_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
 	if err != nil {
 		a.log.Errorf("failed to update user doc with error: %v", err)
 		return adventureLog, nil
@@ -2335,7 +2339,7 @@ combat:
 						}
 						monster.CurrentHP = int32((monster.CurrentHP-damageOvertime)+int32(math.Abs(float64(monster.CurrentHP-damageOvertime)))) / 2
 						enemyAilmentLog := ""
-						enemyAilmentLog += fmt.Sprintf("				**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", monster.Name, int(damageOvertime), ailment, monster.Name, ailment, debuff.CrowdControlTime)
+						enemyAilmentLog += fmt.Sprintf("				**%s lost %v HP!** due to **%s**.\n", monster.Name, int(damageOvertime), ailment)
 						enemyAilmentLog += fmt.Sprintf("				__**%s**__'s HP: %v/%v", monster.Name, monster.CurrentHP, int(monster.StatModifier.HP))
 						aliveMonsters[i] = monster
 						if monster.CurrentHP <= 0 {
@@ -2391,6 +2395,8 @@ combat:
 								} else {
 									enemiesLog += fmt.Sprintf("__**%s**__'s has died!\n", summon.Name+" "+strconv.Itoa(i+1))
 								}
+							} else {
+								aliveSummons = append(aliveSummons, users[targetedUser].Summons[i])
 							}
 						}
 						users[targetedUser].Summons = aliveSummons
@@ -2427,11 +2433,11 @@ combat:
 		adventureLog = append(adventureLog, fmt.Sprintf("%s", enemiesLog))
 		healLogs := ""
 		for i, user := range users {
-			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(users[i])
 			if changedUser != nil {
 				users[i] = changedUser
 			}
-			userLogs += buffLogs
+			healLogs += buffLogs
 			if len(users[i].Summons) > 0 {
 				decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(user.User.Name, users[i].Summons)
 				healLogs += decreaseSummonLog
@@ -2444,7 +2450,6 @@ combat:
 				user.MaxHP = int(user.BattleStats.HP)
 				users[i] = user
 			}
-
 			userHeal := int(user.BaseStats.HP * user.BattleStats.Recovery)
 			if user.CurrentHP != int(user.MaxHP) && user.BattleStats.Recovery > 0.0 {
 				if userHeal+user.CurrentHP > int(user.MaxHP) {
@@ -2459,6 +2464,13 @@ combat:
 			}
 			users[i].CurrentHP = user.CurrentHP
 
+		}
+		for _, user := range users {
+			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.HEALTRAIT {
+				buffedUser, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.HEALTRAIT, false)
+				healLogs += buffString
+				users = buffedUser
+			}
 		}
 		if healLogs != "" {
 			adventureLog = append(adventureLog, fmt.Sprintf("%s", healLogs))
@@ -2536,7 +2548,7 @@ combat:
 				}
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
 			if err != nil {
 				a.log.Errorf("failed to update user doc with error: %v", err)
 				return adventureLog, nil
@@ -2592,7 +2604,7 @@ bossBattle:
 					break
 				}
 				bossCurrentHp = int((bossCurrentHp-damageOvertime)+int(math.Abs(float64(bossCurrentHp-damageOvertime)))) / 2
-				bossStatusAilmentLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**. %s has the status ailment of **%s** for **%v turn(s)**.\n", boss.Name, int(damageOvertime), ailment, boss.Name, ailment, debuff.CrowdControlTime)
+				bossStatusAilmentLogs += fmt.Sprintf("**%s lost %v HP!** due to **%s**.\n", boss.Name, int(damageOvertime), ailment)
 				bossHPPercentage = float64(bossCurrentHp) / float64(bossMaxHp)
 				bossStatusAilmentLogs += fmt.Sprintf("__**%s**__'s **HP: %s%%/100%%**\n", boss.Name, fmt.Sprintf("%.2f", bossHPPercentage*100))
 				if bossCurrentHp <= 0 {
@@ -2865,22 +2877,15 @@ bossBattle:
 			}
 		}
 		for i, user := range users {
-			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(user)
+			buffLogs, changedUser := a.Battle.DecreaseUserBuffDuration(users[i])
 			if changedUser != nil {
 				users[i] = changedUser
 			}
 			healLogs += buffLogs
-			if len(users[i].Summons) > 0 {
+			if users[i].Summons != nil && len(users[i].Summons) > 0 {
 				decreaseSummonLog, newSummons := a.Battle.DecreaseSummonDuration(user.User.Name, users[i].Summons)
 				healLogs += decreaseSummonLog
 				users[i].Summons = newSummons
-			}
-			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.HEALTRAIT {
-				buffedUser, buffString := a.Battle.DetermineTraitActivations([]*models.UserBlob{user}, adventureLog, globals.HEALTRAIT, false)
-				healLogs += buffString
-				user = buffedUser[0]
-				user.MaxHP = int(user.BattleStats.HP)
-				users[i] = user
 			}
 			if user.CurrentHP != int(user.MaxHP) && user.BattleStats.Recovery > 0.0 {
 				userHeal := int(user.BaseStats.HP * user.BattleStats.Recovery)
@@ -2896,10 +2901,18 @@ bossBattle:
 			}
 			users[i].CurrentHP = user.CurrentHP
 		}
+		for _, user := range users {
+			if user.JobClass.Trait != nil && user.JobClass.Trait.Type == globals.HEALTRAIT {
+				buffedUser, buffString := a.Battle.DetermineTraitActivations(users, adventureLog, globals.HEALTRAIT, false)
+				healLogs += buffString
+				users = buffedUser
+			}
+		}
 		if healLogs != "" {
 			adventureLog = append(adventureLog, fmt.Sprintf("**------------------------BEGIN PARTY HEAL TURN------------------------**\n%s**------------------------END PARTY HEAL TURN------------------------**", healLogs))
 		}
 	}
+
 	if battleWin {
 		adventureLog = append(adventureLog, "**---------------------------- PARTY WON THE BATTLE.  GETTING RESULTS. ----------------------------**")
 		levelCap, err := a.levels.ReadDocument("levelCap")
@@ -2960,7 +2973,7 @@ bossBattle:
 
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
 			if err != nil {
 				a.log.Errorf("failed to update winningUsers doc with error: %v", err)
 				return adventureLog, nil
@@ -3175,6 +3188,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 	bossAccuracy := 0.0
 	bossSkillDmg := 0.0
 	bossTdd := 0.0
+	bossDamageMit := 0.0
 	if user.ClassMap[user.CurrentClass].BossBonuses != nil && len(user.ClassMap[user.CurrentClass].BossBonuses) > 0 {
 		for _, bonus := range user.ClassMap[user.CurrentClass].BossBonuses {
 			bossMaxDps += bonus.MaxDPS
@@ -3189,6 +3203,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 			bossAccuracy += bonus.Accuracy
 			bossSkillDmg += bonus.SkillDamageModifier
 			bossTdd += bonus.TargetDefenseDecrease
+			bossDamageMit += bonus.DamageMitigation
 		}
 	}
 	baseStats := models.StatModifier{
@@ -3204,6 +3219,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		Accuracy:               0.85*class.Accuracy + bossAccuracy,
 		TargetDefenseDecrease:  class.TargetDefenseDecrease + bossTdd,
 		SkillDamageModifier:    class.SkillDamageModifier + bossSkillDmg,
+		DamageMitigation:       class.DamageMitigation + bossDamageMit,
 	}
 	equip := user.ClassMap[user.CurrentClass].Equipment
 	gearStats, err := a.getStatsFromGear(&equip)

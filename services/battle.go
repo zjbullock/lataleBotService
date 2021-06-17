@@ -85,7 +85,7 @@ func (b *battle) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 			damageLog += fmt.Sprintf("with the skill ***%s*** ", skillName)
 		}
 
-		defenderDefense := defender.Defense - (defender.Defense * attacker.TargetDefenseDecrease)
+		defenderDefense := defender.Defense - (defender.Defense * (attacker.TargetDefenseDecrease - defender.DamageMitigation))
 		roundedDamage = ((int(damage) - int(defenderDefense)) + int(math.Abs(damage-defenderDefense))) / 2
 
 		criticalChance := randGenerator.Float64()
@@ -223,7 +223,7 @@ func (b *battle) DetermineTraitActivations(users []*models.UserBlob, adventureLo
 					buffString += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
 
 					for j, buffedUser := range buffedUsers {
-						if _, ok := buffedUser.Buffs[user.JobClass.Trait.Name]; !ok {
+						if _, ok := buffedUser.Buffs[user.JobClass.Trait.Name]; !ok || (user.JobClass.Trait.Battle.AoE == true) {
 							diffStats := buffedUsers[j].BaseStats.AddBuffStats(user.JobClass.Trait.Battle.Buff.StatModifier)
 							buffedUsers[j].BattleStats.AddStatModifier(diffStats)
 							buffedUsers[j].Buffs[user.JobClass.Trait.Name] = models.Buff{
@@ -327,7 +327,7 @@ func (b *battle) DecreaseMonsterDebuffDuration(monster *models.MonsterBlob) (str
 			}
 			removedDebuffs += fmt.Sprintf("The effects of __**%s**__ have expired for __***%s***__\n", name, monster.Name)
 			delete(newDebuffs, name)
-		} else if name != "poison" && name != "bleed" && name != "burn" {
+		} else {
 			removedDebuffs += fmt.Sprintf("__**%s**__ has the status ailment of __**%s**__ for **%v more turn(s)**.\n", monster.Name, name, monster.Debuffs[name].CrowdControlTime)
 		}
 	}
@@ -340,11 +340,12 @@ func (b *battle) DecreaseMonsterDebuffDuration(monster *models.MonsterBlob) (str
 
 func (b *battle) InflictStatusAilmentMonster(monster *models.MonsterBlob, statusAilment models.CrowdControlTrait) (string, *models.MonsterBlob) {
 	var debuffStats *models.StatModifier
-	if _, ok := monster.Debuffs[statusAilment.Type]; !ok && statusAilment.Debuff != nil {
-		diffStats := monster.BattleStats.AddBuffStats(*statusAilment.Debuff)
-		monster.BattleStats.SubtractStatModifier(diffStats)
-		debuffStats = &diffStats
-
+	if _, ok := monster.Debuffs[statusAilment.Type]; !ok {
+		if statusAilment.Debuff != nil {
+			diffStats := monster.BattleStats.AddBuffStats(*statusAilment.Debuff)
+			monster.BattleStats.SubtractStatModifier(diffStats)
+			debuffStats = &diffStats
+		}
 		monster.Debuffs[statusAilment.Type] = models.CrowdControlTrait{
 			Type:             statusAilment.Type,
 			Debuff:           debuffStats,
