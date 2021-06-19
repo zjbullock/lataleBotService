@@ -9,6 +9,7 @@ type Query {
     GetAreaList: [AreaInfo!]
     GetBossList(id: String!): [String!]
     GetBossBonus(id: String!): StatInfo
+    GetSetBonus(id: String!): SetBonusResponse
     GetJobList: [JobClassInfo]
     GetBossFight(bossId: String!, userId: String!): AdventureResponse
     GetItemInfo(itemName: String!): ItemInfoResponse

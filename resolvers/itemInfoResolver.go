@@ -39,3 +39,7 @@ func (i *itemInfoResolver) Stats(_ context.Context) *statResolver {
 	}
 	return &statResolver{stat: i.item.Stats}
 }
+
+func (i *itemInfoResolver) SetBonusId(_ context.Context) *string {
+	return i.item.SetBonusId
+}

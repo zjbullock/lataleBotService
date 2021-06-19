@@ -1,0 +1,8 @@
+input SetBonus {
+    Name: String!
+    Id: String!
+    RequiredPieces: Int!
+    CurrentlyEquipped: Int!
+    Bonus: Stat!
+}
+

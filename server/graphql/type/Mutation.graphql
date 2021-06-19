@@ -21,4 +21,5 @@ type Mutation {
     AddNewBoss(Boss: Monster!): String
     AddNewItem(item: Item!): String
     ConvertToInventory: String
+    AddNewSetBonus(setBonus: SetBonus!): String
 }

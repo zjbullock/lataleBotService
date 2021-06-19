@@ -8,6 +8,7 @@ const (
 	CONFIG    = "config"
 	PARTY     = "parties"
 	ITEM      = "items"
+	SETBONUS  = "setBonus"
 	CITY      = "cities"
 	LEVELCAP  = "levelCap"
 	EQUIPMENT = "equipment"
