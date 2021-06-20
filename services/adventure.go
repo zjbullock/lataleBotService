@@ -170,7 +170,7 @@ func (a *adventure) GetShopInventory(id string) (*[]models.Item, error) {
 			{
 				Path:  "levelRequirement",
 				Op:    "<=",
-				Value: user.ClassMap[user.CurrentClass].Level + 10,
+				Value: user.ClassMap[user.CurrentClass].Level + 5,
 			},
 			{
 				Path:  "shop",
@@ -1702,6 +1702,18 @@ func (a *adventure) EquipItem(id, item string) (*string, error) {
 		message := fmt.Sprintf("User Level too low to equip the item.  Required Level: %v", int64(*equipment.LevelRequirement))
 		return &message, nil
 	}
+	if items[0].RequiredClasses != nil && len(*items[0].RequiredClasses) > 0 {
+		found := false
+		for _, class := range *items[0].RequiredClasses {
+			if user.CurrentClass == *class {
+				found = true
+			}
+		}
+		if !found {
+			message := "You are not currently one of the required classes for this item."
+			return &message, nil
+		}
+	}
 	user, message := a.changeEquippedItem(&equipment, user)
 	if message != nil {
 		return message, nil
@@ -2871,7 +2883,7 @@ bossBattle:
 		playerDied := false
 		for i, user := range users {
 			for ailment, debuff := range user.Debuffs {
-				if user.CurrentHP > 0 && debuff.CrowdControlTime != int32(0) && (debuff.Type == "poison" || debuff.Type == "blood" || debuff.Type == "burn") {
+				if user.CurrentHP > 0 && debuff.CrowdControlTime != int32(0) && (debuff.Type == "poison" || debuff.Type == "bleed" || debuff.Type == "burn") {
 					damageOvertime := 0
 					if debuff.Type == "bleed" {
 						damageOvertime = int(float64(user.CurrentHP) * 0.10)

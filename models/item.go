@@ -10,6 +10,7 @@ type Item struct {
 	Stats            *StatModifier `json:"stats" firestore:"stats"`
 	Boss             *string       `json:"boss" firestore:"boss"`
 	SetBonusId       *string       `json:"setBonusId" firestore:"setBonusId"`
+	RequiredClasses  *[]*string    `json:"requiredClasses" firestore:"requiredClasses"`
 }
 
 type InventoryItem struct {

@@ -35,17 +35,23 @@ func (c *classResolver) SetBonuses(_ context.Context) *[]string {
 			Name string
 		}
 		for _, bonus := range c.classInfo.SetBonuses {
-			setBonusSorting = append(setBonusSorting, struct {
-				ID   string
-				Name string
-			}{ID: bonus.Id, Name: bonus.Name})
+			if bonus.CurrentlyEquipped >= bonus.RequiredPieces {
+				setBonusSorting = append(setBonusSorting, struct {
+					ID   string
+					Name string
+				}{ID: bonus.Id, Name: bonus.Name})
+			}
 		}
-		sort.Slice(setBonusSorting, func(i, j int) bool {
-			return setBonusSorting[i].ID < setBonusSorting[j].ID
-		})
-		for _, bonus := range setBonusSorting {
-			setBonuses = append(setBonuses, fmt.Sprintf("%v		|		%s", bonus.ID, bonus.Name))
+		if len(setBonusSorting) > 0 {
+			sort.Slice(setBonusSorting, func(i, j int) bool {
+				return setBonusSorting[i].ID < setBonusSorting[j].ID
+			})
+			for _, bonus := range setBonusSorting {
+				setBonuses = append(setBonuses, fmt.Sprintf("%v		|		%s", bonus.ID, bonus.Name))
+			}
+			return &setBonuses
 		}
+		return nil
 	} else {
 		return nil
 	}

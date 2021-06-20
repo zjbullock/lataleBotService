@@ -43,3 +43,7 @@ func (i *itemInfoResolver) Stats(_ context.Context) *statResolver {
 func (i *itemInfoResolver) SetBonusId(_ context.Context) *string {
 	return i.item.SetBonusId
 }
+
+func (i *itemInfoResolver) RequiredClasses(_ context.Context) *[]*string {
+	return i.item.RequiredClasses
+}

@@ -8,6 +8,7 @@ input Item {
     Cost: Int
     Stats: Stat
     SetBonusId: String
+    RequiredClasses: [String]
 }
 
 input ItemType {
