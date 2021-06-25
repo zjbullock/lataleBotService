@@ -2271,7 +2271,7 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 	}
 	users[0].User.LastActionTime = time.Now()
 	//TODO: DISABLE WHEN RUNNING LOCAL
-	//_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
+	_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
 	if err != nil {
 		a.log.Errorf("failed to update user doc with error: %v", err)
 		return adventureLog, nil
@@ -2613,7 +2613,7 @@ combat:
 				}
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
 			if err != nil {
 				a.log.Errorf("failed to update user doc with error: %v", err)
 				return adventureLog, nil
@@ -3038,7 +3038,7 @@ bossBattle:
 
 			}
 			//TODO: DISABLE WHEN RUNNING LOCAL
-			//_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
+			_, err := a.users.UpdateDocument(userInfo.ID, userInfo)
 			if err != nil {
 				a.log.Errorf("failed to update winningUsers doc with error: %v", err)
 				return adventureLog, nil
