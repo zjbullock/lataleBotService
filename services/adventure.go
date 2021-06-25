@@ -1501,7 +1501,7 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		return nil, &message, err
 	}
 
-	adventureLog, err := a.createAdventureLog([]*models.UserBlob{{User: user, JobClass: classInfo, BaseStats: currentStats, BattleStats: currentStats, MaxHP: int(currentStats.HP), HitCount: 1, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait)}}, models.MonsterBlob{Monster: monster, Name: monster.Name, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait), Rank: monster.Rank}, area.DropRange)
+	adventureLog, err := a.createAdventureLog([]*models.UserBlob{{User: user, JobClass: classInfo, BaseStats: currentStats, BattleStats: currentStats, MaxHP: int(currentStats.HP), HitCount: 1, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait)}}, models.MonsterBlob{Monster: monster, Name: monster.Name, Exp: monster.Exp, Ely: monster.Ely, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait), Rank: monster.Rank}, area.DropRange)
 	if err != nil {
 		a.log.Errorf("encountered error generating adventure log: %v", err)
 		return &adventureLog, nil, err
@@ -2216,6 +2216,9 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			return nil, err
 		}
 		monsterExp := int64(monster.Exp * float64(*expGainRate))
+		a.log.Infof("monster Exp: %v", monster.Exp)
+		a.log.Infof("monster Ely: %v", monster.Ely)
+
 		userClassInfo.Exp += monsterExp
 		monsterEly := int64(monster.Ely * float64(*expGainRate))
 		*users[0].User.Ely += monsterEly
