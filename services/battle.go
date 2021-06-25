@@ -77,7 +77,13 @@ func (b *battle) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 			theMonster = " the "
 		}
 		damageLog += fmt.Sprintf("__**%s**__ hit%s__**%s**__ ", attackerName, theMonster, defenderName)
-		damage := float64(rand.Intn(int(attacker.MaxDPS)-int(attacker.MinDPS))) + attacker.MinDPS
+		damageRange := 0
+		if int(attacker.MaxDPS)-int(attacker.MinDPS) <= 0 {
+			damageRange = int(attacker.MinDPS)
+		} else {
+			damageRange = int(attacker.MaxDPS) - int(attacker.MinDPS)
+		}
+		damage := float64(rand.Intn(damageRange)) + attacker.MinDPS
 		skillChance := randGenerator.Float64()
 		if attacker.SkillProcRate != 0.0 && skillChance <= attacker.SkillProcRate {
 			skillName, damageMod := b.getSkill(randGenerator, *weapon, *class, int(*userLevel), attacker.SkillDamageModifier)
@@ -230,10 +236,12 @@ func (b *battle) DetermineTraitActivations(users []*models.UserBlob, adventureLo
 								StatModifier: diffStats,
 								Duration:     user.JobClass.Trait.Battle.Buff.Duration,
 							}
-							if buffedUsers[j].MaxHP < int(buffedUsers[j].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
-								buffedUsers[j].MaxHP = int(buffedUsers[j].BattleStats.HP)
-								buffedUsers[j].CurrentHP = buffedUsers[j].MaxHP
-							}
+							buffedUsers[j].MaxHP = int(buffedUsers[j].BattleStats.HP)
+							buffedUsers[j].CurrentHP = buffedUsers[j].MaxHP
+							//if buffedUsers[j].MaxHP < int(buffedUsers[j].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
+							//	buffedUsers[j].MaxHP = int(buffedUsers[j].BattleStats.HP)
+							//	buffedUsers[j].CurrentHP = buffedUsers[j].MaxHP
+							//}
 						}
 					}
 				} else {
@@ -245,10 +253,12 @@ func (b *battle) DetermineTraitActivations(users []*models.UserBlob, adventureLo
 							StatModifier: diffStats,
 							Duration:     user.JobClass.Trait.Battle.Buff.Duration,
 						}
-						if buffedUsers[i].MaxHP < int(buffedUsers[i].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
-							buffedUsers[i].MaxHP = int(buffedUsers[i].BattleStats.HP)
-							buffedUsers[i].CurrentHP = buffedUsers[i].MaxHP
-						}
+						buffedUsers[i].MaxHP = int(buffedUsers[i].BattleStats.HP)
+						buffedUsers[i].CurrentHP = buffedUsers[i].MaxHP
+						//if buffedUsers[i].MaxHP < int(buffedUsers[i].BattleStats.HP) && user.JobClass.Trait.Type == globals.BATTLESTARTTRAIT {
+						//	buffedUsers[i].MaxHP = int(buffedUsers[i].BattleStats.HP)
+						//	buffedUsers[i].CurrentHP = buffedUsers[i].MaxHP
+						//}
 					}
 
 				}

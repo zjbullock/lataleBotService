@@ -88,6 +88,10 @@ func (a *adventure) GetItemInfo(itemName string) (*models.Item, *string, error) 
 		message := fmt.Sprintf("Unable to find info regarding an item with the name: %s", itemName)
 		return nil, &message, nil
 	}
+	if items == nil || items != nil && len(items) == 0 {
+		message := fmt.Sprintf("Unable to find info regarding an item with the name: %s", itemName)
+		return nil, &message, nil
+	}
 	return &items[0], nil, nil
 }
 
@@ -194,7 +198,7 @@ func (a *adventure) GetShopInventory(id string) (*[]models.Item, error) {
 		{
 			Path:  "levelRequirement",
 			Op:    "<=",
-			Value: user.ClassMap[user.CurrentClass].Level + 10,
+			Value: user.ClassMap[user.CurrentClass].Level + 5,
 		},
 		{
 			Path:  "shop",
@@ -814,8 +818,16 @@ func (a *adventure) ClassAdvance(id, weapon, class string, givenClass *string) (
 
 func (a *adventure) jobTierMessages(tier int32) string {
 	if tier == 2 {
-		message := fmt.Sprintf("Upon reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earrings, Ring, Cloak, and Stockings**.\n")
-		message += fmt.Sprintf("Your weapon has also been upgraded, and more upgrades have become accessible as a result.  Your continued patronage is appreciated.\n")
+		message := fmt.Sprintf("Congratulations on reaching a Second Tier Class, you have obtained the ability to equip the following items: **Bindi, Glasses, Earrings, Ring, Cloak, and Stockings**.\n")
+		message += fmt.Sprintf("Your continued patronage is appreciated.\n")
+		return message
+	} else if tier == 3 {
+		message := fmt.Sprintf("Congratulations on reaching a Third Tier Class.  Third Tier Classes posses powerful passives known as Traits.  They can give your character an edge in progressing through content.\n")
+		message += fmt.Sprintf("Your continued patronage is appreciated.\n")
+		return message
+	} else if tier == 4 {
+		message := fmt.Sprintf("Congratulations on reaching a Fourth Tier Class.  Fourth Tier Classes expand further upon their previous traits and later gain access to class specific equipment.\n")
+		message += fmt.Sprintf("Your continued patronage is appreciated.\n")
 		return message
 	}
 	return ""
@@ -1786,17 +1798,19 @@ func (a *adventure) swapItemFromInventoryForAnother(user *models.User, newItem *
 	user.ClassMap[user.CurrentClass].Equipment = newEquipment
 	if newItem.SetBonusId != nil {
 		setBonuses := user.ClassMap[user.CurrentClass].SetBonuses
-		if setBonuses[*newItem.SetBonusId] == nil {
-			setBonus, err := a.setBonus.ReadDocument(*newItem.SetBonusId)
-			if err != nil {
-				a.log.Errorf("error retrieving setbonus: %v", err)
-				return user
-			}
-			if setBonus != nil {
-				if setBonuses == nil {
-					setBonuses = make(map[string]*models.SetBonus)
-				}
+		setBonus, err := a.setBonus.ReadDocument(*newItem.SetBonusId)
+		if err != nil {
+			a.log.Errorf("error retrieving setbonus: %v", err)
+			return user
+		}
+		if setBonus != nil {
+			if setBonuses == nil {
+				setBonuses = make(map[string]*models.SetBonus)
 				setBonuses[setBonus.Id] = setBonus
+			} else if *setBonus.Bonus != *setBonuses[setBonus.Id].Bonus {
+				oldBonus := setBonuses[setBonus.Id]
+				oldBonus.Bonus = setBonus.Bonus
+				setBonuses[setBonus.Id] = oldBonus
 			}
 		}
 		setBonuses[*newItem.SetBonusId].CurrentlyEquipped++
@@ -2019,8 +2033,8 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			if jobClass.Trait.CrowdControl != nil && activationChance <= *jobClass.Trait.ActivationRate {
 				userLog += fmt.Sprintf("__**%s**__ activated their trait, __**%s**__!\n", users[0].User.Name, jobClass.Trait.Name)
 				if jobClass.Trait.CrowdControl.Type == "drain" {
-					monsterHP = int(float64(monsterHP) * 0.95)
-					drainHp := int(float64(userMaxHP) * 0.10)
+					monsterHP = int(float64(monsterHP) * 0.975)
+					drainHp := int(float64(userMaxHP) * 0.2)
 					if currentHP+drainHp > userMaxHP {
 						currentHP = userMaxHP
 					} else {
@@ -2151,7 +2165,6 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			users[0].CurrentHP = currentHP
 			users, buffString = a.battle.DetermineTraitActivations(users, adventureLog, globals.REACTIVETRAIT, false)
 			users, buffString := a.battle.DetermineTraitActivations(users, adventureLog, globals.HEALTRAIT, false)
-
 			adventureLog = append(adventureLog, buffString)
 			battleStats = *users[0].BattleStats
 			userMaxHP = int(battleStats.HP)
@@ -2212,14 +2225,14 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
 		}
-		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1)
+		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1, nil)
 		if item != nil {
 			if users[0].User.Inventory.Equipment == nil {
 				users[0].User.Inventory.Equipment = make(map[string]int)
 				users[0].User.Inventory.Event = make(map[string]int)
 				users[0].User.Inventory.Consume = make(map[string]int)
 			}
-			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 25 {
+			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 45 {
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", users[0].User.Name))
 			} else {
 				newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", users[0].User.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
@@ -2239,14 +2252,14 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 		*users[0].User.Ely += monsterEly
 		users[0].User.ClassMap[users[0].User.CurrentClass] = &userClassInfo
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", users[0].User.Name, levelCap.Value))
-		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1)
+		item := a.getRandomItemDrop(*userWeapon, dropRange, *randGenerator, nil, 1, nil)
 		if item != nil {
 			if users[0].User.Inventory.Equipment == nil {
 				users[0].User.Inventory.Equipment = make(map[string]int)
 				users[0].User.Inventory.Event = make(map[string]int)
 				users[0].User.Inventory.Consume = make(map[string]int)
 			}
-			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 25 {
+			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 45 {
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", users[0].User.Name))
 			} else {
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", users[0].User.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
@@ -2337,8 +2350,8 @@ combat:
 				if user.JobClass.Trait.CrowdControl != nil && activationChance <= *user.JobClass.Trait.ActivationRate {
 					userLogs += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
 					if user.JobClass.Trait.CrowdControl.Type == "drain" {
-						currentMonsterHP = int(float64(currentMonsterHP) * 0.95)
-						drainHp := int(float64(users[i].MaxHP) * 0.10)
+						currentMonsterHP = int(float64(currentMonsterHP) * 0.975)
+						drainHp := int(float64(users[i].MaxHP) * 0.2)
 						if users[i].CurrentHP+drainHp > users[i].MaxHP {
 							users[i].CurrentHP = users[i].MaxHP
 						} else {
@@ -2585,14 +2598,14 @@ combat:
 			if primaryUser.ID == userInfo.ID {
 				userInfo.LastActionTime = time.Now()
 			}
-			item := a.getRandomItemDrop(user.Weapon, dropRange, *randGenerator, nil, len(users))
+			item := a.getRandomItemDrop(user.Weapon, dropRange, *randGenerator, nil, len(users), nil)
 			if item != nil {
 				if userInfo.Inventory.Equipment == nil {
 					userInfo.Inventory.Equipment = make(map[string]int)
 					userInfo.Inventory.Event = make(map[string]int)
 					userInfo.Inventory.Consume = make(map[string]int)
 				}
-				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 25 {
+				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 45 {
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", userInfo.Name))
 				} else {
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
@@ -2698,7 +2711,7 @@ bossBattle:
 			bound := false
 			for ailment, debuff := range user.Debuffs {
 				if debuff.Bind {
-					userLogs += fmt.Sprintf("__**%s**__ is currently %s for **%v turn(s)**.\n", user.User.Name, ailment, debuff.CrowdControlTime)
+					userLogs += fmt.Sprintf("__**%s**__ is currently under the effects of __**%s**__ for **%v turn(s)**.\n", user.User.Name, ailment, debuff.CrowdControlTime)
 					bound = true
 				}
 			}
@@ -2724,8 +2737,8 @@ bossBattle:
 					if user.JobClass.Trait.CrowdControl != nil && activationChance <= *user.JobClass.Trait.ActivationRate {
 						userLogs += fmt.Sprintf("__***%s***__ activated their trait, __**%s**__!\n", user.User.Name, user.JobClass.Trait.Name)
 						if user.JobClass.Trait.CrowdControl.Type == "drain" {
-							bossCurrentHp = int(float64(bossCurrentHp) - float64(bossCurrentHp)*0.075)
-							drainHp := int(float64(users[i].MaxHP) * 0.075)
+							bossCurrentHp = int(float64(bossCurrentHp) - float64(bossCurrentHp)*0.05)
+							drainHp := int(float64(users[i].MaxHP) * 0.10)
 							if users[i].CurrentHP+drainHp > users[i].MaxHP {
 								users[i].CurrentHP = users[i].MaxHP
 							} else {
@@ -3009,14 +3022,14 @@ bossBattle:
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ has hit the current Level Cap of: %v, and can no longer level up.", winningUsers.User.Name, levelCap.Value))
 			}
 			userInfo.LastBossActionTime = time.Now()
-			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.Monster.DropRange, *randGenerator, &boss.Name, len(users))
+			item := a.getRandomItemDrop(*userInfo.ClassMap[userInfo.CurrentClass].Equipment.Weapon.Type.WeaponType, *boss.Monster.DropRange, *randGenerator, &boss.Name, len(users), &userInfo.CurrentClass)
 			if item != nil {
 				if userInfo.Inventory.Equipment == nil {
 					userInfo.Inventory.Equipment = make(map[string]int)
 					userInfo.Inventory.Event = make(map[string]int)
 					userInfo.Inventory.Consume = make(map[string]int)
 				}
-				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 25 {
+				if userInfo.Inventory.Equipment[item.Name] == 0 && len(userInfo.Inventory.Equipment) >= 45 {
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", userInfo.Name))
 				} else {
 					adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", userInfo.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
@@ -3121,7 +3134,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 	return userClassInfo, adventureLog, nil
 }
 
-func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand, boss *string, partySize int) *models.Item {
+func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand, boss *string, partySize int, currentClass *string) *models.Item {
 	dropChance := rand.Float64()
 	if partySize > 1 {
 		dropChance = dropChance - (0.05 * float64(partySize))
@@ -3137,11 +3150,26 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 
 		if len(items) > 0 {
 			item := rand.Intn(len(items))
-			if dropChance <= 0.15 {
+			if dropChance <= 0.10 {
 				for i, equip := range items {
 					if *equip.Type.WeaponType == currentWeapon {
 						item = i
 					}
+				}
+			} else if dropChance >= 0.11 && dropChance <= 0.20 {
+				var classItems []models.Item
+				for _, equip := range items {
+					if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
+						for _, requiredClass := range *equip.RequiredClasses {
+							if *requiredClass == *currentClass {
+								classItems = append(classItems, equip)
+							}
+						}
+					}
+				}
+				if classItems != nil && len(classItems) > 0 {
+					item = rand.Intn(len(classItems))
+					return &classItems[item]
 				}
 			}
 			return &items[item]
