@@ -19,6 +19,7 @@ type Manage interface {
 	AddNewMonster(area *models.Area, monster models.Monster) (*string, error)
 	ConvertToInventorySystemBatch() (*string, error)
 	AddNewItem(item *models.Item) (*string, error)
+	AddNewSetBonus(setBonus *models.SetBonus) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
 	CreateExpTable(levels []models.Level) (*[]models.Level, error)
 	ToggleExpEvent(expRate int) error
@@ -35,10 +36,11 @@ type manage struct {
 	config    repositories.ConfigRepository
 	boss      repositories.BossRepository
 	item      repositories.ItemRepository
+	setBonus  repositories.SetBonusRepository
 	log       loggo.Logger
 }
 
-func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, item repositories.ItemRepository, log loggo.Logger) Manage {
+func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, item repositories.ItemRepository, setBonus repositories.SetBonusRepository, log loggo.Logger) Manage {
 	return &manage{
 		areas:     areas,
 		classes:   classes,
@@ -48,6 +50,7 @@ func NewManageService(areas repositories.AreasRepository, levels repositories.Le
 		config:    config,
 		boss:      boss,
 		item:      item,
+		setBonus:  setBonus,
 		log:       log,
 	}
 }
@@ -174,6 +177,15 @@ func (m *manage) AddNewItem(item *models.Item) (*string, error) {
 		return &message, nil
 	}
 	id, err := m.item.InsertDocument(item)
+	if err != nil {
+		m.log.Errorf("error adding new item: %v", err)
+		return nil, err
+	}
+	return id, nil
+}
+
+func (m *manage) AddNewSetBonus(setBonus *models.SetBonus) (*string, error) {
+	id, err := m.setBonus.InsertDocument(setBonus.Id, setBonus)
 	if err != nil {
 		m.log.Errorf("error adding new item: %v", err)
 		return nil, err

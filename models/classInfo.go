@@ -7,5 +7,6 @@ type ClassInfo struct {
 	CurrentWeapon     *string               `json:"currentWeapon,omitempty" firestore:"currentWeapon,omitempty"`
 	OldEquipmentSheet *OldEquipmentSystem   `json:"equipment,omitempty" firestore:"equipment,omitempty"`
 	Equipment         Equipment             `json:"currentEquips" firestore:"currentEquips"`
+	SetBonuses        map[string]*SetBonus  `json:"setBonuses,omitempty" firestore:"setBonuses,omitempty"`
 	BossBonuses       map[string]*BossBonus `json:"bossBonuses" firestore:"bossBonuses"`
 }

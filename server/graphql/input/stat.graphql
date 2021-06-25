@@ -11,4 +11,5 @@ input Stat {
     Recovery: Float!
     SkillDamageModifier: Float!
     TargetDefenseDecrease: Float!
+    DamageMitigation: Float!
 }

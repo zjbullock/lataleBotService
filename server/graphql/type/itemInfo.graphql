@@ -6,6 +6,8 @@ type ItemInfo {
     Description: String
     Cost: Int
     Stats: StatInfo
+    SetBonusId: String
+    RequiredClasses: [String]
 }
 
 type ItemTypeInfo {

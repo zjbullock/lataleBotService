@@ -54,34 +54,36 @@ func init() {
 	}
 	ds = datasource.NewDataSource(l, ctx, client)
 	repos := struct {
-		area    repositories.AreasRepository
-		classes repositories.ClassRepository
-		user    repositories.UserRepository
-		levels  repositories.LevelRepository
-		equips  repositories.EquipmentRepository
-		config  repositories.ConfigRepository
-		party   repositories.PartyRepository
-		boss    repositories.BossRepository
-		item    repositories.ItemRepository
+		area     repositories.AreasRepository
+		classes  repositories.ClassRepository
+		user     repositories.UserRepository
+		levels   repositories.LevelRepository
+		equips   repositories.EquipmentRepository
+		config   repositories.ConfigRepository
+		party    repositories.PartyRepository
+		boss     repositories.BossRepository
+		item     repositories.ItemRepository
+		setBonus repositories.SetBonusRepository
 	}{
-		area:    repositories.NewAreaRepo(l, ds),
-		classes: repositories.NewClassRepo(l, ds),
-		user:    repositories.NewUserRepo(l, ds),
-		levels:  repositories.NewLevelRepo(l, ds),
-		equips:  repositories.NewEquipmentRepo(l, ds),
-		config:  repositories.NewConfigRepo(l, ds),
-		party:   repositories.NewPartiesRepo(l, ds),
-		boss:    repositories.NewBossRepository(l, ds),
-		item:    repositories.NewItemRepo(l, ds),
+		area:     repositories.NewAreaRepo(l, ds),
+		classes:  repositories.NewClassRepo(l, ds),
+		user:     repositories.NewUserRepo(l, ds),
+		levels:   repositories.NewLevelRepo(l, ds),
+		equips:   repositories.NewEquipmentRepo(l, ds),
+		config:   repositories.NewConfigRepo(l, ds),
+		party:    repositories.NewPartiesRepo(l, ds),
+		boss:     repositories.NewBossRepository(l, ds),
+		item:     repositories.NewItemRepo(l, ds),
+		setBonus: repositories.NewSetBonusRepo(l, ds),
 	}
 	service := struct {
 		Adventure services.Adventure
 		Manage    services.Manage
-		Damage    services.Damage
+		Damage    services.Battle
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, repos.boss, repos.item, l),
-		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, repos.boss, repos.item, l),
-		Damage:    services.NewDamageService(l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.config, repos.party, repos.boss, repos.item, repos.setBonus, configMap, l),
+		Manage:    services.NewManageService(repos.area, repos.levels, repos.classes, repos.user, repos.equips, repos.config, repos.boss, repos.item, repos.setBonus, l),
+		Damage:    services.NewBattleService(l),
 	}
 	handlerFuncs = &handler.Funcs{
 		Ctx: ctx,
