@@ -1501,7 +1501,7 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		return nil, &message, err
 	}
 
-	adventureLog, err := a.createAdventureLog([]*models.UserBlob{{User: user, JobClass: classInfo, BaseStats: currentStats, BattleStats: currentStats, MaxHP: int(currentStats.HP), HitCount: 1, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait)}}, models.MonsterBlob{Monster: monster, Name: monster.Name, Exp: monster.Exp, Ely: monster.Ely, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait), Rank: monster.Rank}, area.DropRange)
+	adventureLog, err := a.createAdventureLog([]*models.UserBlob{{User: user, JobClass: classInfo, BaseStats: currentStats, BattleStats: currentStats, MaxHP: int(currentStats.HP), HitCount: 1, Buffs: make(map[string]models.Buff), Debuffs: make(map[string]models.CrowdControlTrait)}}, models.MonsterBlob{Monster: monster, Name: monster.Name, Bound: false, Exp: monster.Exp, Ely: monster.Ely, Buffs: make(map[string]models.Buff), CurrentHP: int32(monster.Stats.HP), StatModifier: &monster.Stats, BattleStats: &monster.Stats, Debuffs: make(map[string]models.CrowdControlTrait), Rank: monster.Rank}, area.DropRange)
 	if err != nil {
 		a.log.Errorf("encountered error generating adventure log: %v", err)
 		return &adventureLog, nil, err
@@ -2224,6 +2224,7 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 		*users[0].User.Ely += monsterEly
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", users[0].User.Name, utils.String(monsterExp), utils.String(monsterEly)))
 		newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, users[0].User, levelCap.Value)
+		adventureLog = newAdventureLog
 		if err != nil {
 			a.log.Errorf("error processing level ups: %v", err)
 			return adventureLog, nil
@@ -2238,12 +2239,11 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			if users[0].User.Inventory.Equipment[item.Name] == 0 && len(users[0].User.Inventory.Equipment) >= 45 {
 				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired nothing as their inventory is full!", users[0].User.Name))
 			} else {
-				newAdventureLog = append(newAdventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", users[0].User.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
+				adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ acquired a **%s - Level %v %s**", users[0].User.Name, item.Name, *item.LevelRequirement, *item.Type.WeaponType))
 				users[0].User.Inventory.Equipment[item.Name]++
 			}
 		}
 		users[0].User.ClassMap[users[0].User.CurrentClass] = &newUserClassInfo
-		adventureLog = newAdventureLog
 	} else if battleWin && levelCap.Value == users[0].User.ClassMap[users[0].User.CurrentClass].Level {
 		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s WON THE BATTLE.  GETTING RESULTS. ----------------------------**", users[0].User.Name))
 		userClassInfo := *users[0].User.ClassMap[users[0].User.CurrentClass]
