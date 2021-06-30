@@ -108,8 +108,12 @@ func (r *Resolver) AddNewArea(ctx context.Context, args struct{ Area models.Area
 	return id, nil
 }
 
-func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
-	message, err := r.Services.Adventure.EquipItem(args.Id, strings.TrimSpace(args.Name))
+func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }) (message *string, err error) {
+	if strings.ToLower(strings.TrimSpace(args.Name)) == "best" {
+		message, err = r.Services.Adventure.EquipBestItems(args.Id)
+	} else {
+		message, err = r.Services.Adventure.EquipItem(args.Id, strings.TrimSpace(args.Name))
+	}
 	if err != nil {
 		r.Log.Errorf("error equipping specified item")
 		return nil, err
