@@ -24,6 +24,7 @@ type Adventure interface {
 	JoinParty(partyId, id string) (*string, error)
 	LeaveParty(id string) (*string, error)
 	EquipItem(id, item string) (*string, error)
+	EquipBestItems(id string) (*string, error)
 	BuyItem(id, item string) (*string, error)
 	SellItem(id, item string, user *models.User, quantity int) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
@@ -1683,6 +1684,93 @@ func (a *adventure) SellItem(id, item string, sellUser *models.User, quantity in
 	return &noItemMessage, nil
 }
 
+func (a *adventure) EquipBestItems(id string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user info: %v", err)
+		message := "User has not yet selected a class, or created an account"
+		return &message, nil
+	}
+	if len(user.Inventory.Equipment) < 1 {
+		message := fmt.Sprintf("You are already wearing your best equipment.")
+		return &message, nil
+	}
+	equipmentItems := user.Inventory.Equipment
+	var itemList []models.Item
+	for item, _ := range equipmentItems {
+		queriedItem, err := a.item.QueryForDocument(&[]models.QueryArg{
+			{
+				"name",
+				"==",
+				item,
+			},
+		})
+		if err != nil {
+			message := fmt.Sprintf("Encounted error querying for item data: %v", err)
+			return &message, err
+		}
+		if queriedItem == nil {
+			message := fmt.Sprintf("There was a problem retrieving data on an item in your inventory....")
+			return &message, err
+		}
+		itemList = append(itemList, *queriedItem)
+	}
+	userClass := user.ClassMap[user.CurrentClass]
+	var equipMap map[string]interface{}
+	currentUserEquipment, _ := json.Marshal(userClass.Equipment)
+	json.Unmarshal(currentUserEquipment, &equipMap)
+	for _, item := range itemList {
+		if item.RequiredClasses != nil && len(*item.RequiredClasses) > 0 {
+			found := false
+			for _, class := range *item.RequiredClasses {
+				if user.CurrentClass == *class {
+					found = true
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+		if float64(userClass.Level) >= *item.LevelRequirement {
+			var jsonBody []byte
+			if item.Type.Type == "weapon" {
+				jsonBody, err = json.Marshal(equipMap["weapon"])
+			} else {
+				jsonBody, err = json.Marshal(equipMap[strings.ToLower(*item.Type.WeaponType)])
+			}
+			if err != nil {
+				a.log.Errorf("attempting to marshal item info resulted in: %v", err)
+				return nil, err
+			}
+			var currentItem models.Item
+			json.Unmarshal(jsonBody, &currentItem)
+
+			if item.Type.Type == "armor" && *item.LevelRequirement > *currentItem.LevelRequirement {
+
+				newUser, message := a.changeEquippedItem(&item, user)
+				if message != nil {
+					a.log.Infof(*message)
+				}
+				user = newUser
+			} else if item.Type.Type == "weapon" && *item.LevelRequirement > *currentItem.LevelRequirement {
+				newUser, message := a.changeEquippedItem(&item, user)
+				if message != nil {
+					a.log.Infof(*message)
+				}
+				user = newUser
+			}
+		}
+	}
+	_, err = a.users.UpdateDocument(user.ID, user)
+	if err != nil {
+		a.log.Errorf("error updating user with new equip: %v", err)
+		failMessage := fmt.Sprintf("There was an error equipping the new piece of equipment.")
+		return &failMessage, nil
+	}
+	message := fmt.Sprintf("Successfully equipped user with the highest level equipment found in their inventory!")
+	return &message, nil
+}
+
 func (a *adventure) EquipItem(id, item string) (*string, error) {
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
@@ -1766,7 +1854,7 @@ func (a *adventure) changeEquippedItem(newItem *models.Item, user *models.User) 
 			return user, nil
 		} else {
 			message := fmt.Sprintf("Your class cannot equip weapons of type: %s", *newItem.Type.WeaponType)
-			return nil, &message
+			return user, &message
 		}
 	}
 	user = a.swapItemFromInventoryForAnother(user, newItem, equipMap)
@@ -1780,17 +1868,13 @@ func (a *adventure) swapItemFromInventoryForAnother(user *models.User, newItem *
 	}
 	item := models.Item{}
 	if newItem.Type.Type == "weapon" {
-		a.log.Debugf("weapon meta: %v", equipMap["weapon"])
 		oldItemData, _ := json.Marshal(equipMap["weapon"])
 		json.Unmarshal(oldItemData, &item)
 		equipMap["weapon"] = newItem
 	} else {
-		armorType := strings.ToLower(*newItem.Type.WeaponType)
-		a.log.Debugf("armor meta: %v", equipMap[armorType])
 		oldItemData, _ := json.Marshal(equipMap[strings.ToLower(*newItem.Type.WeaponType)])
 		json.Unmarshal(oldItemData, &item)
 		equipMap[strings.ToLower(*newItem.Type.WeaponType)] = *newItem
-		a.log.Debugf("armor meta: %v", equipMap[armorType])
 	}
 	var newEquipment models.Equipment
 	newEquipmentData, _ := json.Marshal(equipMap)
@@ -1807,27 +1891,27 @@ func (a *adventure) swapItemFromInventoryForAnother(user *models.User, newItem *
 			if setBonuses == nil {
 				setBonuses = make(map[string]*models.SetBonus)
 				setBonuses[setBonus.Id] = setBonus
-			} else if *setBonus.Bonus != *setBonuses[setBonus.Id].Bonus {
+			} else if setBonuses[setBonus.Id] != nil {
 				oldBonus := setBonuses[setBonus.Id]
-				oldBonus.Bonus = setBonus.Bonus
+				safeBonus := *setBonus.Bonus
+				oldBonus.Bonus = &safeBonus
 				setBonuses[setBonus.Id] = oldBonus
+			} else {
+				setBonuses[setBonus.Id] = setBonus
 			}
+			setBonuses[setBonus.Id].CurrentlyEquipped++
+			user.ClassMap[user.CurrentClass].SetBonuses = setBonuses
 		}
-		setBonuses[*newItem.SetBonusId].CurrentlyEquipped++
-		user.ClassMap[user.CurrentClass].SetBonuses = setBonuses
 	}
-	a.log.Debugf("currentEquips: %v", user.ClassMap[user.CurrentClass].Equipment)
 	user.Inventory.Equipment[item.Name]++
 	if item.SetBonusId != nil {
 		setBonuses := user.ClassMap[user.CurrentClass].SetBonuses
-		a.log.Debugf("setBonusInfo: %v", setBonuses[*item.SetBonusId])
 		setBonuses[*item.SetBonusId].CurrentlyEquipped--
 		if setBonuses[*item.SetBonusId].CurrentlyEquipped == int32(0) {
 			delete(setBonuses, *item.SetBonusId)
 		}
 		user.ClassMap[user.CurrentClass].SetBonuses = setBonuses
 	}
-	a.log.Debugf("equip inventory: %v", user.Inventory.Equipment)
 	return user
 }
 
