@@ -3226,7 +3226,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 	if partySize > 1 {
 		dropChance = dropChance - (0.05 * float64(partySize))
 	}
-	if boss != nil && dropChance <= 0.25 {
+	if boss != nil && dropChance <= 0.40 {
 		items, _ := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "boss",
@@ -3238,31 +3238,29 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 		if len(items) > 0 {
 			item := rand.Intn(len(items))
 			if dropChance <= 0.10 {
-				for i, equip := range items {
+				for _, equip := range items {
 					if *equip.Type.WeaponType == currentWeapon {
-						item = i
+						return &equip
 					}
 				}
-			} else if dropChance >= 0.11 && dropChance <= 0.20 {
-				var classItems []models.Item
-				for _, equip := range items {
-					if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
-						for _, requiredClass := range *equip.RequiredClasses {
-							if *requiredClass == *currentClass {
-								classItems = append(classItems, equip)
-							}
+			}
+			var classItems []models.Item
+			for _, equip := range items {
+				if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
+					for _, requiredClass := range *equip.RequiredClasses {
+						if *requiredClass == *currentClass {
+							classItems = append(classItems, equip)
 						}
 					}
 				}
-				if classItems != nil && len(classItems) > 0 {
-					item = rand.Intn(len(classItems))
-					return &classItems[item]
-				}
 			}
-			return &items[item]
+			if classItems != nil && len(classItems) > 0 {
+				item = rand.Intn(len(classItems))
+			}
+			return &classItems[item]
 		}
 	}
-	if dropChance <= 0.50 {
+	if dropChance <= 0.40 {
 		items, err := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "levelRequirement",
@@ -3296,7 +3294,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 		item := rand.Intn(len(droppableItems))
 		return &droppableItems[item]
 	}
-	if dropChance <= 0.75 {
+	if dropChance <= 0.80 {
 		items, err := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "levelRequirement",
