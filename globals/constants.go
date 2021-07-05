@@ -8,6 +8,7 @@ const (
 	CONFIG    = "config"
 	PARTY     = "parties"
 	ITEM      = "items"
+	SETBONUS  = "setBonus"
 	CITY      = "cities"
 	LEVELCAP  = "levelCap"
 	EQUIPMENT = "equipment"
@@ -17,12 +18,14 @@ const (
 type TraitType string
 
 const (
-	REACTIVETRAIT    TraitType = "REACTIVETRAIT"
-	GUARDTRAIT       TraitType = "GUARDTRAIT"
-	HPPERCENTTRAIT   TraitType = "HPPERCENTTRAIT"
-	DEATHTRAIT       TraitType = "DEATHTRAIT"
-	ATTACKTRAIT      TraitType = "ATTACKTRAIT"
-	BATTLESTARTTRAIT TraitType = "BATTLESTARTTRAIT"
-	SUMMONTRAIT      TraitType = "SUMMONTRAIT"
-	AFTERATTACKTRAIT TraitType = "AFTERATTACKTRAIT"
+	REACTIVETRAIT        TraitType = "REACTIVETRAIT"
+	GUARDTRAIT           TraitType = "GUARDTRAIT"
+	HPPERCENTTRAIT       TraitType = "HPPERCENTTRAIT"
+	DEATHTRAIT           TraitType = "DEATHTRAIT"
+	ATTACKTRAIT          TraitType = "ATTACKTRAIT"
+	BATTLESTARTTRAIT     TraitType = "BATTLESTARTTRAIT"
+	SUMMONTRAIT          TraitType = "SUMMONTRAIT"
+	AFTERATTACKTRAIT     TraitType = "AFTERATTACKTRAIT"
+	HEALTRAIT            TraitType = "HEALTRAIT"
+	DEFENDINGCHANCETRAIT TraitType = "DEFENDINGCHANCETRAIT"
 )

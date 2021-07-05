@@ -15,7 +15,7 @@ type Resolver struct {
 	Services struct {
 		Adventure services.Adventure
 		Manage    services.Manage
-		Damage    services.Damage
+		Damage    services.Battle
 	}
 	Log loggo.Logger
 }
@@ -108,8 +108,12 @@ func (r *Resolver) AddNewArea(ctx context.Context, args struct{ Area models.Area
 	return id, nil
 }
 
-func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
-	message, err := r.Services.Adventure.EquipItem(args.Id, strings.TrimSpace(args.Name))
+func (r *Resolver) EquipItem(ctx context.Context, args struct{ Id, Name string }) (message *string, err error) {
+	if strings.ToLower(strings.TrimSpace(args.Name)) == "best" {
+		message, err = r.Services.Adventure.EquipBestItems(args.Id)
+	} else {
+		message, err = r.Services.Adventure.EquipItem(args.Id, strings.TrimSpace(args.Name))
+	}
 	if err != nil {
 		r.Log.Errorf("error equipping specified item")
 		return nil, err
@@ -219,6 +223,14 @@ func (r *Resolver) AddNewParty(ctx context.Context, args struct{ Id string }) (*
 
 func (r *Resolver) AddNewItem(ctx context.Context, args struct{ Item models.Item }) (*string, error) {
 	id, err := r.Services.Manage.AddNewItem(&args.Item)
+	if err != nil {
+		return nil, err
+	}
+	return id, nil
+}
+
+func (r *Resolver) AddNewSetBonus(ctx context.Context, args struct{ SetBonus models.SetBonus }) (*string, error) {
+	id, err := r.Services.Manage.AddNewSetBonus(&args.SetBonus)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +363,22 @@ func (r *Resolver) GetBossBonus(ctx context.Context, args struct{ Id string }) (
 		SkillProcRate:          bonus.SkillProcRate,
 		Recovery:               bonus.Recovery,
 		SkillDamageModifier:    bonus.SkillDamageModifier,
+		TargetDefenseDecrease:  bonus.TargetDefenseDecrease,
+		DamageMitigation:       bonus.DamageMitigation,
 	}}, nil
+}
+
+func (r *Resolver) GetSetBonus(ctx context.Context, args struct{ Id string }) (*setBonusResponseResolver, error) {
+	bonus, err := r.Services.Adventure.GetSetBonus(args.Id)
+	if err != nil {
+		r.Log.Errorf("error retrieving boss bonus: %v", err)
+		return nil, err
+	}
+	if bonus == nil {
+		message := "That set bonus does not exist.  Please enter a valid one."
+		return &setBonusResponseResolver{setBonus: nil, message: &message}, nil
+	}
+	return &setBonusResponseResolver{setBonus: bonus, message: nil}, nil
 }
 
 func (r *Resolver) GetBossList(ctx context.Context, args struct{ Id string }) (*[]string, error) {

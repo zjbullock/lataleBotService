@@ -1,0 +1,7 @@
+type SetBonusInfo {
+    Name: String
+    Id: String
+    RequiredPieces: Int
+    CurrentlyEquipped: Int
+    Bonus: StatInfo
+}

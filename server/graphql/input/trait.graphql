@@ -13,6 +13,8 @@ input Trait {
 input CrowdControlTrait {
     Type: String!
     CrowdControlTime: Int!
+    Bind: Boolean!
+    Debuff: Stat
 }
 
 input SummonTrait {

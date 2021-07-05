@@ -11,4 +11,5 @@ type StatInfo {
     SkillDamageModifier: Float
     Recovery: Float
     TargetDefenseDecrease: Float
+    DamageMitigation: Float
 }

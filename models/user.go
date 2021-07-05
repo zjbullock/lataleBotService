@@ -14,7 +14,6 @@ type User struct {
 	Party              *string               `json:"party,omitempty" firestore:"party,omitempty"`
 	Classes            *[]*ClassInfo         `firestore:"classes,omitempty"`
 	PartyMembers       *[]string
-	Buffs              map[string]*Buff
 }
 
 type Inventory struct {
@@ -24,25 +23,30 @@ type Inventory struct {
 }
 
 type UserBlob struct {
-	JobClass           *JobClass
-	BaseStats          *StatModifier
-	BattleStats        *StatModifier
-	User               *User
-	CurrentHP          int
-	MaxHP              int
-	UserLevel          int32
-	Weapon             string
-	CrowdControlled    *int32
-	CrowdControlStatus *string
-	Summons            []Summons
+	JobClass    *JobClass
+	BaseStats   *StatModifier
+	BattleStats *StatModifier
+	User        *User
+	CurrentHP   int
+	MaxHP       int
+	UserLevel   int32
+	Weapon      string
+	Summons     []Summons
+	Buffs       map[string]Buff
+	Debuffs     map[string]CrowdControlTrait
+	HitCount    int
 }
 
 type MonsterBlob struct {
-	CurrentHP      int32
-	Name           string
-	Ely            float64
-	Exp            float64
-	StatModifier   *StatModifier
-	Rank           int32
-	StatusAilments map[string]int
+	Monster      Monster
+	CurrentHP    int32
+	Name         string
+	Ely          float64
+	Exp          float64
+	StatModifier *StatModifier
+	BattleStats  *StatModifier
+	Rank         int32
+	Buffs        map[string]Buff
+	Debuffs      map[string]CrowdControlTrait
+	Bound        bool
 }

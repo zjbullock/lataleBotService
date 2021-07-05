@@ -26,8 +26,10 @@ type Trait struct {
 }
 
 type CrowdControlTrait struct {
-	Type             string `json:"type" firestore:"type"`
-	CrowdControlTime int32  `json:"crowdControlTime,omitempty" firestore:"crowdControlTime"`
+	Type             string        `json:"type" firestore:"type"`
+	Debuff           *StatModifier `json:"debuff" firestore:"debuff"`
+	Bind             bool          `json:"bind" firestore:"bind"`
+	CrowdControlTime int32         `json:"crowdControlTime,omitempty" firestore:"crowdControlTime"`
 }
 
 type SummonTrait struct {

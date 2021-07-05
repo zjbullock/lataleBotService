@@ -9,6 +9,8 @@ type Item struct {
 	Cost             *int32        `json:"cost" firestore:"cost"`
 	Stats            *StatModifier `json:"stats" firestore:"stats"`
 	Boss             *string       `json:"boss" firestore:"boss"`
+	SetBonusId       *string       `json:"setBonusId" firestore:"setBonusId"`
+	RequiredClasses  *[]*string    `json:"requiredClasses" firestore:"requiredClasses"`
 }
 
 type InventoryItem struct {
