@@ -6,6 +6,8 @@ type User struct {
 	Name               string                `json:"name" firestore:"name"`
 	ID                 string                `json:"id" firestore:"id"`
 	Ely                *int64                `json:"ely" firestore:"ely"`
+	AscensionLevel     int32                 `json:"ascensionLevel" firestore:"ascensionLevel"`
+	AscensionExp       int64                 `json:"ascensionExp" firestore:"ascensionExp"`
 	LastActionTime     time.Time             `json:"lastActionTime" firestore:"lastActionTime"`
 	LastBossActionTime time.Time             `json:"lastBossActionTime" firestore:"lastBossActionTime"`
 	CurrentClass       string                `json:"currentClass" firestore:"currentClass"`

@@ -25,6 +25,14 @@ func (u *userResolver) Ely(_ context.Context) *float64 {
 	return &ely
 }
 
+func (u *userResolver) AscensionLevel(_ context.Context) int32 {
+	return u.user.AscensionLevel
+}
+
+func (u *userResolver) AscensionExp(_ context.Context) float64 {
+	return float64(u.user.AscensionExp)
+}
+
 func (u *userResolver) CurrentClass(_ context.Context) string {
 	return u.user.CurrentClass
 }

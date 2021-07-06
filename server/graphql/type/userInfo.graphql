@@ -1,6 +1,8 @@
 type UserInfo {
     Name: String!
     ID: String!
+    AscensionLevel: Int!
+    AscensionExp: Float!
     Ely: Float
     CurrentClass: String!
     Classes: [UserClassInfo]
