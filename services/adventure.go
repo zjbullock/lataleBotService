@@ -2304,8 +2304,13 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 		monsterExp := int64(monster.Exp * float64(*expGainRate))
 		a.log.Infof("monster Exp: %v", monster.Exp)
 		a.log.Infof("monster Ely: %v", monster.Ely)
-
-		userClassInfo.Exp += monsterExp
+		if users[0].User.AscensionLevel > 0 && userClassInfo.Level == levelCap.Value {
+			newExp := users[0].User.AscensionExp
+			newExp += monsterExp
+			users[0].User.AscensionExp = newExp
+		} else {
+			userClassInfo.Exp += monsterExp
+		}
 		monsterEly := int64(monster.Ely * float64(*expGainRate))
 		*users[0].User.Ely += monsterEly
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", users[0].User.Name, utils.String(monsterExp), utils.String(monsterEly)))
@@ -2639,7 +2644,13 @@ combat:
 			userInfo := user.User
 			userClassInfo := *user.User.ClassMap[user.User.CurrentClass]
 			monsterExp := totalExpReward / int64(len(users)) * int64(*expGainRate)
-			userClassInfo.Exp += monsterExp
+			if user.User.AscensionLevel > 0 && userClassInfo.Level == levelCap.Value {
+				newExp := user.User.AscensionExp
+				newExp += monsterExp
+				user.User.AscensionExp = newExp
+			} else {
+				userClassInfo.Exp += monsterExp
+			}
 			monsterEly := totalElyReward / int64(len(users)) * int64(*expGainRate)
 			oldEly := *user.User.Ely
 			oldEly += totalElyReward / int64(len(users)) * int64(*expGainRate)
@@ -2650,9 +2661,9 @@ combat:
 				a.log.Errorf("error processing level ups: %v", err)
 				return adventureLog, nil
 			}
-			user.User.ClassMap[user.User.CurrentClass] = &newUserClassInfo
-			user.User.AscensionLevel = newUser.AscensionLevel
-			user.User.AscensionExp = newUser.AscensionExp
+			userInfo.ClassMap[user.User.CurrentClass] = &newUserClassInfo
+			userInfo.AscensionLevel = newUser.AscensionLevel
+			userInfo.AscensionExp = newUser.AscensionExp
 			adventureLog = newAdventureLog
 			if primaryUser.ID == userInfo.ID {
 				userInfo.LastActionTime = time.Now()
@@ -3056,6 +3067,13 @@ bossBattle:
 			userClassInfo, adventureLog = a.determineBossBonusDrop(winningUsers.User.Name, userClassInfo, boss.Monster, adventureLog)
 			bossExp := int64(float64(boss.Exp*float64(*expGainRate)) * partyBonus)
 			userClassInfo.Exp += bossExp
+			if userInfo.AscensionLevel > 0 && userClassInfo.Level == levelCap.Value {
+				newExp := userInfo.AscensionExp
+				newExp += bossExp
+				userInfo.AscensionExp = newExp
+			} else {
+				userClassInfo.Exp += bossExp
+			}
 			oldEly := *winningUsers.User.Ely
 			bossEly := int64(float64(boss.Ely*float64(*expGainRate)) * partyBonus)
 			oldEly += bossEly
@@ -3067,9 +3085,9 @@ bossBattle:
 				a.log.Errorf("error processing level ups: %v", err)
 				return adventureLog, nil
 			}
-			winningUsers.User.ClassMap[winningUsers.User.CurrentClass] = &newUserClassInfo
-			winningUsers.User.AscensionExp = newUser.AscensionExp
-			winningUsers.User.AscensionLevel = newUser.AscensionLevel
+			userInfo.ClassMap[userInfo.CurrentClass] = &newUserClassInfo
+			userInfo.AscensionExp = newUser.AscensionExp
+			userInfo.AscensionLevel = newUser.AscensionLevel
 			adventureLog = newAdventureLog
 
 			userInfo.LastBossActionTime = time.Now()
@@ -3242,8 +3260,8 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 			a.log.Errorf("error getting ascension level data: %v", err)
 			return userClassInfo, adventureLog, user, err
 		}
-		if userClassInfo.Exp >= ascensionLevel.Exp {
-			userClassInfo.Exp -= ascensionLevel.Exp
+		if user.AscensionExp >= ascensionLevel.Exp {
+			user.AscensionExp -= ascensionLevel.Exp
 			user.AscensionLevel++
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **ASCENSION LEVEL UP**!  Current Ascension Level: %v", user.Name, user.AscensionLevel))
 			return a.processLevelUps(userClassInfo, adventureLog, user, levelCap)
