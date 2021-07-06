@@ -10,6 +10,7 @@ type Mutation {
     SellItem(id: String!, name: String!): String
     SellAllItems(id: String!): String
     AddLevelTable(levels: [LevelInput!]!): [Level]!
+    AddAscensionTable: [Level]!
     AddNewParty(id: String!): String
     JoinParty(id: String!, partyId: String!): String
     LeaveParty(id: String!): String

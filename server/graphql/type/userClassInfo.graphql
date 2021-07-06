@@ -1,6 +1,7 @@
 type UserClassInfo {
     Exp: Float!
     Level: Float!
+    AscensionLevel: Float!
     Name: String!
     Equipment: EquipmentInfo!
     BossBonuses: [String!]

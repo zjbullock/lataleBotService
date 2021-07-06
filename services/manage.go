@@ -22,6 +22,7 @@ type Manage interface {
 	AddNewSetBonus(setBonus *models.SetBonus) (*string, error)
 	IncreaseLevelCap(level int) (*[]models.Level, error)
 	CreateExpTable(levels []models.Level) (*[]models.Level, error)
+	CreateAscensionTable() (*[]models.Level, error)
 	ToggleExpEvent(expRate int) error
 	AddNewEquipmentSheet(equipment models.OldEquipmentSheet) (*string, error)
 	AddNewBoss(boss models.Monster) (*string, error)
@@ -31,6 +32,7 @@ type manage struct {
 	areas     repositories.AreasRepository
 	classes   repositories.ClassRepository
 	levels    repositories.LevelRepository
+	ascension repositories.AscensionRepository
 	users     repositories.UserRepository
 	equipment repositories.EquipmentRepository
 	config    repositories.ConfigRepository
@@ -40,11 +42,12 @@ type manage struct {
 	log       loggo.Logger
 }
 
-func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, item repositories.ItemRepository, setBonus repositories.SetBonusRepository, log loggo.Logger) Manage {
+func NewManageService(areas repositories.AreasRepository, levels repositories.LevelRepository, ascension repositories.AscensionRepository, classes repositories.ClassRepository, users repositories.UserRepository, equip repositories.EquipmentRepository, config repositories.ConfigRepository, boss repositories.BossRepository, item repositories.ItemRepository, setBonus repositories.SetBonusRepository, log loggo.Logger) Manage {
 	return &manage{
 		areas:     areas,
 		classes:   classes,
 		levels:    levels,
+		ascension: ascension,
 		users:     users,
 		equipment: equip,
 		config:    config,
@@ -261,6 +264,49 @@ func (m *manage) CreateExpTable(levels []models.Level) (*[]models.Level, error) 
 	_, err = m.levels.UpdateDocument(globals.LEVELCAP, levels[len(levels)-1])
 	if err != nil {
 		m.log.Errorf("error updating level cap: %v", err)
+		return nil, err
+	}
+	return &addedLevels, nil
+}
+
+func (m *manage) CreateAscensionTable() (*[]models.Level, error) {
+	currentAscensionLevels, err := m.levels.QueryDocuments(globals.ASCENSION, nil)
+	if err != nil {
+		m.log.Errorf("error retrieving current levels: %v", err)
+		return nil, err
+	}
+	var addedLevels []models.Level
+
+	for i := int32(1); i <= 9999; i++ {
+		stringAscensionLevel := utils.ThirtyTwoBitIntToString(i)
+		ascensionLevel := models.Level{
+			Value: i,
+			Exp:   1000000000 + int64(10000000*int64(i)),
+		}
+		if currentAscensionLevels[stringAscensionLevel] != nil {
+			_, err := m.ascension.UpdateDocument(stringAscensionLevel, ascensionLevel)
+			if err != nil {
+				m.log.Errorf("error updating level: %v with error: %v", ascensionLevel.Value, err)
+				return nil, err
+			}
+			addedLevels = append(addedLevels, ascensionLevel)
+		} else {
+			_, err := m.ascension.InsertDocument(&stringAscensionLevel, ascensionLevel)
+			if err != nil {
+				m.log.Errorf("error inserting ascension level: %v with error: %v", ascensionLevel.Value, err)
+				return nil, err
+			}
+			addedLevels = append(addedLevels, ascensionLevel)
+
+		}
+
+	}
+	_, err = m.ascension.UpdateDocument(globals.LEVELCAP, models.Level{
+		Value: 9999,
+		Exp:   35000000000 + int64(10000000*int64(9999)),
+	})
+	if err != nil {
+		m.log.Errorf("error updating ascension level cap: %v", err)
 		return nil, err
 	}
 	return &addedLevels, nil
