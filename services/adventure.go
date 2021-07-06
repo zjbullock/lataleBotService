@@ -660,10 +660,9 @@ func (a *adventure) ClassChange(id, class string, weapon *string) (*string, erro
 						panic("error getting boots")
 					}
 					user.ClassMap[class] = &models.ClassInfo{
-						Name:      classInfo.Name,
-						Level:     classInfo.LevelRequirement,
-						Ascension: 0,
-						Exp:       0,
+						Name:  classInfo.Name,
+						Level: classInfo.LevelRequirement,
+						Exp:   0,
 						Equipment: models.Equipment{
 							Weapon:    *startingWeapon,
 							Top:       *top,
@@ -795,7 +794,6 @@ func (a *adventure) ClassAdvance(id, weapon, class string, givenClass *string) (
 					user.ClassMap[class] = &models.ClassInfo{
 						Name:        classInfo.Name,
 						Level:       user.ClassMap[classToUse].Level,
-						Ascension:   0,
 						Exp:         user.ClassMap[classToUse].Exp,
 						Equipment:   equips,
 						BossBonuses: user.ClassMap[classToUse].BossBonuses,
@@ -2311,7 +2309,7 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 		monsterEly := int64(monster.Ely * float64(*expGainRate))
 		*users[0].User.Ely += monsterEly
 		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%s*** Ely!", users[0].User.Name, utils.String(monsterExp), utils.String(monsterEly)))
-		newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, users[0].User, levelCap.Value)
+		newUserClassInfo, newAdventureLog, newUser, err := a.processLevelUps(userClassInfo, adventureLog, users[0].User, levelCap.Value)
 		adventureLog = newAdventureLog
 		if err != nil {
 			a.log.Errorf("error processing level ups: %v", err)
@@ -2332,6 +2330,8 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 			}
 		}
 		users[0].User.ClassMap[users[0].User.CurrentClass] = &newUserClassInfo
+		users[0].User.AscensionExp = newUser.AscensionExp
+		users[0].User.AscensionLevel = newUser.AscensionLevel
 	} else {
 		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", users[0].User.Name))
 	}
@@ -2645,12 +2645,14 @@ combat:
 			oldEly += totalElyReward / int64(len(users)) * int64(*expGainRate)
 			userInfo.Ely = &oldEly
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", user.User.Name, utils.String(monsterExp), monsterEly))
-			newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, user.User, levelCap.Value)
+			newUserClassInfo, newAdventureLog, newUser, err := a.processLevelUps(userClassInfo, adventureLog, user.User, levelCap.Value)
 			if err != nil {
 				a.log.Errorf("error processing level ups: %v", err)
 				return adventureLog, nil
 			}
 			user.User.ClassMap[user.User.CurrentClass] = &newUserClassInfo
+			user.User.AscensionLevel = newUser.AscensionLevel
+			user.User.AscensionExp = newUser.AscensionExp
 			adventureLog = newAdventureLog
 			if primaryUser.ID == userInfo.ID {
 				userInfo.LastActionTime = time.Now()
@@ -3060,12 +3062,14 @@ bossBattle:
 			userInfo.ClassMap[userInfo.CurrentClass] = &userClassInfo
 			userInfo.Ely = &oldEly
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained ***%s*** points of experience and ***%v*** Ely!", winningUsers.User.Name, utils.String(bossExp), bossEly))
-			newUserClassInfo, newAdventureLog, err := a.processLevelUps(userClassInfo, adventureLog, winningUsers.User, levelCap.Value)
+			newUserClassInfo, newAdventureLog, newUser, err := a.processLevelUps(userClassInfo, adventureLog, winningUsers.User, levelCap.Value)
 			if err != nil {
 				a.log.Errorf("error processing level ups: %v", err)
 				return adventureLog, nil
 			}
 			winningUsers.User.ClassMap[winningUsers.User.CurrentClass] = &newUserClassInfo
+			winningUsers.User.AscensionExp = newUser.AscensionExp
+			winningUsers.User.AscensionLevel = newUser.AscensionLevel
 			adventureLog = newAdventureLog
 
 			userInfo.LastBossActionTime = time.Now()
@@ -3138,24 +3142,27 @@ func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonste
 	return true
 }
 
-func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int32) (models.ClassInfo, []string, error) {
-	if userClassInfo.Ascension == 0 {
+func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int32) (models.ClassInfo, []string, *models.User, error) {
+	if user.AscensionLevel == 0 && user.ClassMap[user.CurrentClass].Level < int32(200) {
 		a.log.Infof("ascension is in fact 0")
 		level, err := a.levels.ReadDocument(utils.ThirtyTwoBitIntToString(userClassInfo.Level))
 		if err != nil {
 			a.log.Errorf("error getting level data: %v", err)
-			return userClassInfo, adventureLog, err
+			return userClassInfo, adventureLog, user, err
 		}
 		a.log.Infof("userclassinfo: exp: %v", userClassInfo.Exp)
 		a.log.Infof("level: exp: %v", level.Exp)
 		if levelCap == userClassInfo.Level {
-			userClassInfo.Exp = 0.0
-			userClassInfo.Ascension = 1
+			if user.AscensionLevel == int32(0) {
+				userClassInfo.Exp = 0.0
+				user.AscensionLevel = 1
+				user.AscensionExp = 0
+			}
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ** has reached the level cap and unlocked Ascension Levels!  Ascension Levels will slowly boost stats and max out at Ascension Level 9999.  Good luck.**", user.Name))
-			return userClassInfo, adventureLog, nil
+			return userClassInfo, adventureLog, user, nil
 		}
 		if userClassInfo.Exp >= level.Exp {
-			a.log.Infof("userclassinfo: ascension: %v", userClassInfo.Ascension)
+			a.log.Infof("userclassinfo: ascension: %v", user.AscensionLevel)
 
 			if userClassInfo.Level < levelCap {
 				userClassInfo.Exp -= level.Exp
@@ -3167,7 +3174,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 				advanceJobs, err := a.classes.QueryDocuments(&[]models.QueryArg{{Path: "classRequirement", Op: "==", Value: user.CurrentClass}})
 				if err != nil {
 					a.log.Errorf("error querying for 2nd tier classes")
-					return userClassInfo, adventureLog, err
+					return userClassInfo, adventureLog, user, err
 				}
 				possibleJobs := *advanceJobs
 				jobText := ""
@@ -3187,7 +3194,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 				advanceJobs, err := a.classes.QueryDocuments(&[]models.QueryArg{{Path: "classRequirement", Op: "==", Value: user.CurrentClass}})
 				if err != nil {
 					a.log.Errorf("error querying for 3rd tier classes")
-					return userClassInfo, adventureLog, err
+					return userClassInfo, adventureLog, user, err
 				}
 				possibleJobs := *advanceJobs
 				jobText := ""
@@ -3207,7 +3214,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 				advanceJobs, err := a.classes.QueryDocuments(&[]models.QueryArg{{Path: "classRequirement", Op: "==", Value: user.CurrentClass}})
 				if err != nil {
 					a.log.Errorf("error querying for 4th tier classes")
-					return userClassInfo, adventureLog, err
+					return userClassInfo, adventureLog, user, err
 				}
 				possibleJobs := *advanceJobs
 				jobText := ""
@@ -3223,31 +3230,31 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 					adventureLog = append(adventureLog, fmt.Sprintf("Congratulations!  Now that you've reached level %v, you may use the **-classAdvance <Class> <Weapon>** command to advance to ***%s***", jobs[0].LevelRequirement, jobText))
 				}
 			}
-			a.log.Infof("userclassinfo: ascension: %v", userClassInfo.Ascension)
+			a.log.Infof("userclassinfo: ascension: %v", user.AscensionLevel)
 			return a.processLevelUps(userClassInfo, adventureLog, user, levelCap)
 		} else {
 			adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", utils.String(userClassInfo.Exp), utils.String(level.Exp)))
 		}
 
-	} else if userClassInfo.Ascension > 0 {
-		ascensionLevel, err := a.ascension.ReadDocument(utils.ThirtyTwoBitIntToString(userClassInfo.Ascension))
+	} else if user.AscensionLevel > 0 {
+		ascensionLevel, err := a.ascension.ReadDocument(utils.ThirtyTwoBitIntToString(user.AscensionLevel))
 		if err != nil {
 			a.log.Errorf("error getting ascension level data: %v", err)
-			return userClassInfo, adventureLog, err
+			return userClassInfo, adventureLog, user, err
 		}
 		if userClassInfo.Exp >= ascensionLevel.Exp {
 			userClassInfo.Exp -= ascensionLevel.Exp
-			userClassInfo.Ascension++
-			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **ASCENSION LEVEL UP**!  Current Ascension Level: %v", user.Name, userClassInfo.Ascension))
+			user.AscensionLevel++
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ **ASCENSION LEVEL UP**!  Current Ascension Level: %v", user.Name, user.AscensionLevel))
 			return a.processLevelUps(userClassInfo, adventureLog, user, levelCap)
-		} else if userClassInfo.Ascension == 9999 {
+		} else if user.AscensionLevel == 9999 {
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ** has reached the Ascension Level cap!  Congratulations!!!!**", user.Name))
-			return userClassInfo, adventureLog, nil
+			return userClassInfo, adventureLog, user, nil
 		} else {
 			adventureLog = append(adventureLog, fmt.Sprintf("Current Ascension Exp: **%s/%s**", utils.String(userClassInfo.Exp), utils.String(ascensionLevel.Exp)))
 		}
 	}
-	return userClassInfo, adventureLog, nil
+	return userClassInfo, adventureLog, user, nil
 }
 
 func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.LevelRange, rand rand.Rand, boss *string, partySize int, currentClass *string) *models.Item {
@@ -3416,8 +3423,8 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		DamageMitigation:       class.DamageMitigation + bossDamageMit,
 	}
 
-	if user.ClassMap[user.CurrentClass].Ascension > 0 {
-		ascensionLevel := float64(user.ClassMap[user.CurrentClass].Ascension)
+	if user.ClassMap[user.CurrentClass].Level == 200 && user.AscensionLevel > 0 {
+		ascensionLevel := float64(user.AscensionLevel)
 		ascensionStats := models.StatModifier{
 			MaxDPS:                 30 * ascensionLevel,
 			MinDPS:                 30 * ascensionLevel,

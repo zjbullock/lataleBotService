@@ -19,10 +19,6 @@ func (c *classResolver) Level(_ context.Context) float64 {
 	return float64(c.classInfo.Level)
 }
 
-func (c *classResolver) AscensionLevel(_ context.Context) float64 {
-	return float64(c.classInfo.Ascension)
-}
-
 func (c *classResolver) Exp(_ context.Context) float64 {
 	return float64(c.classInfo.Exp)
 }
