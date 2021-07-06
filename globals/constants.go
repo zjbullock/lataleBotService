@@ -5,6 +5,7 @@ const (
 	USERS     = "users"
 	AREAS     = "areas"
 	LEVELS    = "levels"
+	ASCENSION = "ascension"
 	CONFIG    = "config"
 	PARTY     = "parties"
 	ITEM      = "items"

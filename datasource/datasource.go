@@ -65,6 +65,8 @@ func (f *fireStoreDB) InsertDocument(collection string, data interface{}) (*stri
 }
 
 func (f *fireStoreDB) UpdateDocument(collection, profileId string, data interface{}) (*time.Time, error) {
+	f.log.Debugf("collection: %s, id: %s, data: %v", collection, profileId, data)
+
 	res, err := f.Client.Collection(collection).Doc(profileId).Set(f.ctx, data)
 	if err != nil {
 		f.log.Errorf("error setting document: %s in collection :%s with error: %v", profileId, collection, err)

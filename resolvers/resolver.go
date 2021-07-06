@@ -78,6 +78,19 @@ func (r *Resolver) AddLevelTable(ctx context.Context, args struct{ Levels []mode
 	return levels, nil
 }
 
+func (r *Resolver) AddAscensionTable(ctx context.Context) ([]*levelResolver, error) {
+	levelTable, err := r.Services.Manage.CreateAscensionTable()
+	if err != nil {
+		r.Log.Errorf("error getting level table: %v", err)
+		return nil, err
+	}
+	var levels []*levelResolver
+	for _, level := range *levelTable {
+		levels = append(levels, &levelResolver{level: level})
+	}
+	return levels, nil
+}
+
 func (r *Resolver) AddNewMonster(ctx context.Context, args struct {
 	Area    string
 	Monster models.Monster
