@@ -3269,7 +3269,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ ** has reached the Ascension Level cap!  Congratulations!!!!**", user.Name))
 			return userClassInfo, adventureLog, user, nil
 		} else {
-			adventureLog = append(adventureLog, fmt.Sprintf("Current Ascension Exp: **%s/%s**", utils.String(userClassInfo.Exp), utils.String(ascensionLevel.Exp)))
+			adventureLog = append(adventureLog, fmt.Sprintf("Current Ascension Exp: **%s/%s**", utils.String(user.AscensionExp), utils.String(ascensionLevel.Exp)))
 		}
 	}
 	return userClassInfo, adventureLog, user, nil
