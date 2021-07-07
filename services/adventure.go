@@ -3303,21 +3303,19 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 					}
 				}
 			}
-			if dropChance <= 0.45 {
-				var classItems []models.Item
-				for _, equip := range items {
-					if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
-						for _, requiredClass := range *equip.RequiredClasses {
-							if *requiredClass == *currentClass {
-								classItems = append(classItems, equip)
-							}
+			var classItems []models.Item
+			for _, equip := range items {
+				if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
+					for _, requiredClass := range *equip.RequiredClasses {
+						if *requiredClass == *currentClass {
+							classItems = append(classItems, equip)
 						}
 					}
 				}
-				if classItems != nil && len(classItems) > 0 {
-					item = rand.Intn(len(classItems))
-					return &classItems[item]
-				}
+			}
+			if classItems != nil && len(classItems) > 0 {
+				item = rand.Intn(len(classItems))
+				return &classItems[item]
 			}
 			return &items[item]
 		}
