@@ -7,7 +7,7 @@ type Mutation {
     IncreaseLevelCap(levelCap: Int!): [Level]!
     EquipItem(id: String!, name: String!): String
     BuyItem(id: String!, name: String!): String
-    SellItem(id: String!, name: String!): String
+    SellItem(id: String!, name: String!, quantity: Float): String
     SellAllItems(id: String!): String
     AddLevelTable(levels: [LevelInput!]!): [Level]!
     AddAscensionTable: [Level]!

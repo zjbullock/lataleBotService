@@ -143,8 +143,16 @@ func (r *Resolver) BuyItem(ctx context.Context, args struct{ Id, Name string }) 
 	return message, err
 }
 
-func (r *Resolver) SellItem(ctx context.Context, args struct{ Id, Name string }) (*string, error) {
-	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), nil, 1)
+func (r *Resolver) SellItem(ctx context.Context, args struct {
+	Id, Name string
+	Quantity *float64
+}) (*string, error) {
+	quantity := 1
+	if args.Quantity != nil {
+		r.Log.Infof("Quantity: %v", quantity)
+		quantity = int(*args.Quantity)
+	}
+	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), nil, quantity)
 	if err != nil {
 		r.Log.Errorf("error selling specified item")
 		return nil, err
