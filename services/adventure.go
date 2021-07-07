@@ -1664,9 +1664,14 @@ func (a *adventure) SellItem(id, item string, sellUser *models.User, quantity in
 		user.Inventory.Consume = make(map[string]int)
 	}
 	if user.Inventory.Equipment != nil && user.Inventory.Equipment[itemData.Name] > 0 {
+		if quantity > user.Inventory.Equipment[itemData.Name] {
+			quantity = user.Inventory.Equipment[itemData.Name]
+		}
+		elyMade := int64(0)
 		for i := 0; i < quantity; i++ {
 			ely := *user.Ely
 			ely += int64(*itemData.Cost / 2)
+			elyMade += int64(*itemData.Cost / 2)
 			user.Inventory.Equipment[itemData.Name]--
 			if user.Inventory.Equipment[itemData.Name] == 0 {
 				delete(user.Inventory.Equipment, itemData.Name)
@@ -1679,7 +1684,7 @@ func (a *adventure) SellItem(id, item string, sellUser *models.User, quantity in
 			message := fmt.Sprintf("There was a problem selling your item...")
 			return &message, nil
 		}
-		message := fmt.Sprintf("Successfully sold the ***%s*** for ***%v*** ely!", itemData.Name, *itemData.Cost/2)
+		message := fmt.Sprintf("Successfully sold **%v** ***%s***(s) for ***%v*** ely!", quantity, itemData.Name, elyMade)
 		return &message, nil
 	}
 	noItemMessage := fmt.Sprintf("There does not appear to be an item with that name in your inventory!")
