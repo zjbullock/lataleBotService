@@ -33,6 +33,10 @@ func (i *itemInfoResolver) Cost(_ context.Context) *int32 {
 	return i.item.Cost
 }
 
+func (i *itemInfoResolver) Boss(_ context.Context) *string {
+	return i.item.Boss
+}
+
 func (i *itemInfoResolver) Stats(_ context.Context) *statResolver {
 	if i.item.Stats == nil {
 		return nil
