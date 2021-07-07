@@ -3285,7 +3285,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 	if partySize > 1 {
 		dropChance = dropChance - (0.05 * float64(partySize))
 	}
-	if boss != nil && dropChance <= 0.40 {
+	if boss != nil && dropChance <= 0.50 {
 		items, _ := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "boss",
@@ -3303,7 +3303,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 					}
 				}
 			}
-			if dropChance <= 0.35 {
+			if dropChance <= 0.45 {
 				var classItems []models.Item
 				for _, equip := range items {
 					if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
@@ -3322,7 +3322,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 			return &items[item]
 		}
 	}
-	if dropChance <= 0.40 {
+	if dropChance <= 0.20 {
 		items, err := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "levelRequirement",
