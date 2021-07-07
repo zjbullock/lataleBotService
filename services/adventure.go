@@ -3449,7 +3449,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		DamageMitigation:       class.DamageMitigation + bossDamageMit,
 	}
 
-	if user.ClassMap[user.CurrentClass].Level == 200 && user.AscensionLevel > 0 {
+	if user.AscensionLevel > 0 {
 		ascensionLevel := float64(user.AscensionLevel)
 		ascensionStats := models.StatModifier{
 			MaxDPS:                 30 * ascensionLevel,
