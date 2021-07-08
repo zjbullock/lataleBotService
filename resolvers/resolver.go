@@ -152,7 +152,7 @@ func (r *Resolver) SellItem(ctx context.Context, args struct {
 		r.Log.Infof("Quantity: %v", quantity)
 		quantity = int(*args.Quantity)
 	}
-	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), nil, quantity)
+	message, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(args.Name), quantity, true)
 	if err != nil {
 		r.Log.Errorf("error selling specified item")
 		return nil, err
@@ -160,27 +160,49 @@ func (r *Resolver) SellItem(ctx context.Context, args struct {
 	return message, err
 }
 
-func (r *Resolver) SellAllItems(ctx context.Context, args struct{ Id string }) (*string, error) {
-	user, message, err := r.Services.Adventure.GetUserInfo(args.Id)
-	if err != nil {
-		r.Log.Errorf("error getting user info")
-		return message, err
-	}
+func (r *Resolver) SellAllItems(ctx context.Context, args struct {
+	Id   string
+	Boss bool
+}) (*string, error) {
 	inventory, _, err := r.Services.Adventure.GetUserInventory(args.Id)
 	if err != nil {
 		r.Log.Errorf("error getting user inventory")
 	}
 	if inventory != nil {
 		for equip, count := range inventory.Equipment {
-			_, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(equip), user, count)
-			if err != nil {
-				r.Log.Errorf("error equipping specified item")
-				return nil, err
+			if !strings.Contains(equip, "[LOCKED]") {
+				_, err := r.Services.Adventure.SellItem(args.Id, strings.TrimSpace(equip), count, args.Boss)
+				if err != nil {
+					r.Log.Errorf("error selling specified item")
+					return nil, err
+				}
 			}
 		}
 	}
 	finishedSelling := "You've sold all items in your inventory!"
 	return &finishedSelling, nil
+}
+
+func (r *Resolver) LockItem(ctx context.Context, args struct {
+	Id, Name string
+}) (*string, error) {
+	message, err := r.Services.Adventure.LockItem(args.Id, strings.TrimSpace(args.Name))
+	if err != nil {
+		r.Log.Errorf("error locking specified item")
+		return nil, err
+	}
+	return message, err
+}
+
+func (r *Resolver) UnlockItem(ctx context.Context, args struct {
+	Id, Name string
+}) (*string, error) {
+	message, err := r.Services.Adventure.UnlockItem(args.Id, strings.TrimSpace(args.Name))
+	if err != nil {
+		r.Log.Errorf("error unlocking specified item")
+		return nil, err
+	}
+	return message, err
 }
 
 func (r *Resolver) GetUserInventory(ctx context.Context, args struct{ Id string }) (*inventoryResponseResolver, error) {

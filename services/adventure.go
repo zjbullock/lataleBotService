@@ -26,7 +26,9 @@ type Adventure interface {
 	EquipItem(id, item string) (*string, error)
 	EquipBestItems(id string) (*string, error)
 	BuyItem(id, item string) (*string, error)
-	SellItem(id, item string, user *models.User, quantity int) (*string, error)
+	SellItem(id, item string, quantity int, sellBoss bool) (*string, error)
+	LockItem(id, item string) (*string, error)
+	UnlockItem(id, lockedItem string) (*string, error)
 	GetBaseStat(id string) (*models.StatModifier, *string, error)
 	ClassAdvance(id, weapon, class string, givenClass *string) (*string, error)
 	GetJobList() (*[]models.JobClass, error)
@@ -1638,7 +1640,11 @@ func (a *adventure) BuyItem(id, item string) (*string, error) {
 	return &message, nil
 }
 
-func (a *adventure) SellItem(id, item string, sellUser *models.User, quantity int) (*string, error) {
+func (a *adventure) SellItem(id, item string, quantity int, sellBoss bool) (*string, error) {
+	if strings.Contains(item, "[LOCKED]") {
+		message := "Locked items cannot be sold!"
+		return &message, nil
+	}
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
 		a.log.Errorf("error getting user info: %v", err)
@@ -1651,10 +1657,10 @@ func (a *adventure) SellItem(id, item string, sellUser *models.User, quantity in
 		return message, err
 	}
 	if itemData == nil {
-		message := fmt.Sprintf("Sorry, that item was unable to be found in your bag.  Please use the item's name with proper captilization.")
+		message := fmt.Sprintf("Sorry, that item was unable to be found in your bag.  Plea` use the item's name with proper captilization.")
 		return &message, nil
 	}
-	if (itemData.Boss != nil || int32(*itemData.LevelRequirement) >= user.ClassMap[user.CurrentClass].Level) && sellUser != nil {
+	if (itemData.Boss != nil || int32(*itemData.LevelRequirement) >= user.ClassMap[user.CurrentClass].Level) && sellBoss != false {
 		message := fmt.Sprintf("Skipping this item in sellAll as it is a boss item.")
 		return &message, nil
 	}
@@ -1705,22 +1711,24 @@ func (a *adventure) EquipBestItems(id string) (*string, error) {
 	equipmentItems := user.Inventory.Equipment
 	var itemList []models.Item
 	for item, _ := range equipmentItems {
-		queriedItem, err := a.item.QueryForDocument(&[]models.QueryArg{
-			{
-				"name",
-				"==",
-				item,
-			},
-		})
-		if err != nil {
-			message := fmt.Sprintf("Encounted error querying for item data: %v", err)
-			return &message, err
+		if !strings.Contains(item, "[LOCKED]") {
+			queriedItem, err := a.item.QueryForDocument(&[]models.QueryArg{
+				{
+					"name",
+					"==",
+					item,
+				},
+			})
+			if err != nil {
+				message := fmt.Sprintf("Encounted error querying for item data: %v", err)
+				return &message, err
+			}
+			if queriedItem == nil {
+				message := fmt.Sprintf("There was a problem retrieving data on an item in your inventory....")
+				return &message, err
+			}
+			itemList = append(itemList, *queriedItem)
 		}
-		if queriedItem == nil {
-			message := fmt.Sprintf("There was a problem retrieving data on an item in your inventory....")
-			return &message, err
-		}
-		itemList = append(itemList, *queriedItem)
 	}
 	userClass := user.ClassMap[user.CurrentClass]
 	var equipMap map[string]interface{}
@@ -1778,6 +1786,64 @@ func (a *adventure) EquipBestItems(id string) (*string, error) {
 	return &message, nil
 }
 
+func (a *adventure) LockItem(id, item string) (*string, error) {
+	if strings.Contains(item, "[LOCKED]") {
+		message := "A locked item cannot be locked again!"
+		return &message, nil
+	}
+	user, err := a.users.ReadDocument(id)
+
+	if user.Inventory.Equipment[item] < 1 {
+		message := fmt.Sprintf("The item %s does not appear to be in your inventory...", item)
+		return &message, nil
+	}
+	lockedItem := item + "[LOCKED]"
+	user.Inventory.Equipment[lockedItem]++
+	user.Inventory.Equipment[item]--
+	if user.Inventory.Equipment[item] == 0 {
+		newEquipment := user.Inventory.Equipment
+		delete(newEquipment, item)
+		user.Inventory.Equipment = newEquipment
+	}
+	_, err = a.users.UpdateDocument(user.ID, user)
+	if err != nil {
+		a.log.Errorf("error updating user with new locked item: %v", err)
+		failMessage := fmt.Sprintf("There was an error locking the item.")
+		return &failMessage, nil
+	}
+	successMessage := fmt.Sprintf("Successfully locked 1 %s!", item)
+	return &successMessage, nil
+}
+
+func (a *adventure) UnlockItem(id, lockedItem string) (*string, error) {
+	unLockedItem := lockedItem
+	if !strings.Contains(lockedItem, "[LOCKED]") {
+		lockedItem = lockedItem + "[LOCKED]"
+	} else {
+		unLockedItem = strings.ReplaceAll(unLockedItem, "[LOCKED]", "")
+	}
+	user, err := a.users.ReadDocument(id)
+	if user.Inventory.Equipment[lockedItem] < 1 {
+		message := fmt.Sprintf("The lockedItem %s does not appear to be in your inventory...", lockedItem)
+		return &message, nil
+	}
+	user.Inventory.Equipment[unLockedItem]++
+	user.Inventory.Equipment[lockedItem]--
+	if user.Inventory.Equipment[lockedItem] == 0 {
+		newEquipment := user.Inventory.Equipment
+		delete(newEquipment, lockedItem)
+		user.Inventory.Equipment = newEquipment
+	}
+	_, err = a.users.UpdateDocument(user.ID, user)
+	if err != nil {
+		a.log.Errorf("error updating user with new unlocked lockedItem: %v", err)
+		failMessage := fmt.Sprintf("There was an error unlocking the lockedItem.")
+		return &failMessage, nil
+	}
+	successMessage := fmt.Sprintf("Successfully unlocked 1 %s!", lockedItem)
+	return &successMessage, nil
+}
+
 func (a *adventure) EquipItem(id, item string) (*string, error) {
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
@@ -1785,8 +1851,12 @@ func (a *adventure) EquipItem(id, item string) (*string, error) {
 		message := "User has not yet selected a class, or created an account"
 		return &message, nil
 	}
+	if strings.Contains(item, "[LOCKED]") {
+		message := fmt.Sprintf("The %s can't be equipped because it is currently locked.  Unlock it first.", item)
+		return &message, nil
+	}
 	if user.Inventory.Equipment[item] < 1 {
-		message := fmt.Sprintf("The item %s does not appear to be in your inventory...", item)
+		message := fmt.Sprintf("A %s does not appear to be in your inventory...", item)
 		return &message, nil
 	}
 	items, err := a.item.QueryDocuments(&[]models.QueryArg{

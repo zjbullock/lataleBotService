@@ -8,7 +8,9 @@ type Mutation {
     EquipItem(id: String!, name: String!): String
     BuyItem(id: String!, name: String!): String
     SellItem(id: String!, name: String!, quantity: Float): String
-    SellAllItems(id: String!): String
+    SellAllItems(id: String!, boss: Boolean!): String
+    LockItem(id: String!, name: String!): String
+    UnlockItem(id: String!, name: String!): String
     AddLevelTable(levels: [LevelInput!]!): [Level]!
     AddAscensionTable: [Level]!
     AddNewParty(id: String!): String
