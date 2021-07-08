@@ -3470,13 +3470,13 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 			HP:                     30 * ascensionLevel,
 			Recovery:               0,
 			CriticalDamageModifier: 0,
-			CriticalRate:           0.0005 * ascensionLevel,
+			CriticalRate:           0.00001 * ascensionLevel,
 			SkillProcRate:          0,
 			Evasion:                0,
-			Accuracy:               0,
-			TargetDefenseDecrease:  0.002 * ascensionLevel,
+			Accuracy:               0.000020002 * ascensionLevel,
+			TargetDefenseDecrease:  0.00002 * ascensionLevel,
 			SkillDamageModifier:    0,
-			DamageMitigation:       0.001 * ascensionLevel,
+			DamageMitigation:       0.00001 * ascensionLevel,
 		}
 		baseStats.AddStatModifier(ascensionStats)
 	}
