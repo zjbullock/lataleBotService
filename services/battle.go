@@ -90,8 +90,8 @@ func (b *battle) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 			damage = damage * 1.25 * damageMod
 			damageLog += fmt.Sprintf("with the skill ***%s*** ", skillName)
 		}
-
-		defenderDefense := defender.Defense - (defender.Defense * (attacker.TargetDefenseDecrease - defender.DamageMitigation))
+		damage -= damage * defender.DamageMitigation
+		defenderDefense := defender.Defense - (defender.Defense * attacker.TargetDefenseDecrease)
 		roundedDamage = ((int(damage) - int(defenderDefense)) + int(math.Abs(damage-defenderDefense))) / 2
 
 		criticalChance := randGenerator.Float64()
@@ -150,7 +150,9 @@ func (b *battle) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 	} else {
 		damageLog += fmt.Sprintf("__**%s**__ hit __**%s**__ ", boss.Name, user.User.Name)
 	}
-	roundedDamage := ((int(damage) - int(user.BattleStats.Defense)) + int(math.Abs(damage-user.BattleStats.Defense))) / 2
+	damage -= damage * user.BattleStats.DamageMitigation
+	defenderDefense := user.BattleStats.Defense - (user.BattleStats.Defense * boss.Stats.TargetDefenseDecrease)
+	roundedDamage := ((int(damage) - int(defenderDefense)) + int(math.Abs(damage-defenderDefense))) / 2
 	criticalChance := randGenerator.Float64()
 	damageLog += fmt.Sprintf("for ")
 	if boss.Stats.CriticalRate != 0.0 && criticalChance <= boss.Stats.CriticalRate {
@@ -167,7 +169,9 @@ func (b *battle) DetermineBossDamage(randGenerator *rand.Rand, user models.UserB
 				if bossSkill != nil {
 					damageToSummon *= bossSkill.SkillDamageModifier
 				}
-				summonRoundedDamage := ((damageToSummon) - (summon.StatModifier.Defense)) + (math.Abs(damageToSummon-summon.StatModifier.Defense))/2
+				damageToSummon -= damage * summon.StatModifier.DamageMitigation
+				summonDefense := summon.StatModifier.Defense - (summon.StatModifier.Defense * boss.Stats.TargetDefenseDecrease)
+				summonRoundedDamage := ((damageToSummon) - (summonDefense)) + (math.Abs(damageToSummon-summonDefense))/2
 				updatedUser.Summons[i].StatModifier.HP -= summonRoundedDamage
 				damageLog += fmt.Sprintf("\n __**%s**__ has also taken **%v** damage!\n", summon.Name+" "+strconv.Itoa(i+1), int(summonRoundedDamage))
 				if updatedUser.Summons[i].StatModifier.HP > 0.0 {
