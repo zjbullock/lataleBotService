@@ -3285,7 +3285,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 	if partySize > 1 {
 		dropChance = dropChance - (0.05 * float64(partySize))
 	}
-	if boss != nil && dropChance <= 0.50 {
+	if boss != nil && dropChance <= 0.80 {
 		items, _ := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "boss",
@@ -3293,29 +3293,43 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 				Value: *boss,
 			},
 		})
-
+		bossDropChance := rand.Float64()
 		if len(items) > 0 {
 			item := rand.Intn(len(items))
-			if dropChance <= 0.10 {
+			if bossDropChance <= 0.1 {
 				for _, equip := range items {
 					if *equip.Type.WeaponType == currentWeapon {
 						return &equip
 					}
 				}
 			}
-			var classItems []models.Item
-			for _, equip := range items {
-				if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
-					for _, requiredClass := range *equip.RequiredClasses {
-						if *requiredClass == *currentClass {
-							classItems = append(classItems, equip)
+			if bossDropChance <= 0.5 {
+				var classItems []models.Item
+				for _, equip := range items {
+					if equip.RequiredClasses != nil && len(*equip.RequiredClasses) > 0 {
+						for _, requiredClass := range *equip.RequiredClasses {
+							if *requiredClass == *currentClass {
+								classItems = append(classItems, equip)
+							}
 						}
 					}
 				}
+				if classItems != nil && len(classItems) > 0 {
+					item = rand.Intn(len(classItems))
+					return &classItems[item]
+				}
 			}
-			if classItems != nil && len(classItems) > 0 {
-				item = rand.Intn(len(classItems))
-				return &classItems[item]
+			if bossDropChance <= 0.8 {
+				var normalBossItems []models.Item
+				for _, equip := range items {
+					if equip.RequiredClasses == nil {
+						normalBossItems = append(normalBossItems, equip)
+					}
+				}
+				if normalBossItems != nil && len(normalBossItems) > 0 {
+					item = rand.Intn(len(normalBossItems))
+					return &normalBossItems[item]
+				}
 			}
 			return &items[item]
 		}
@@ -3354,7 +3368,7 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 		item := rand.Intn(len(droppableItems))
 		return &droppableItems[item]
 	}
-	if dropChance <= 0.80 {
+	if dropChance <= 0.90 {
 		items, err := a.item.QueryDocuments(&[]models.QueryArg{
 			{
 				Path:  "levelRequirement",
@@ -3456,13 +3470,13 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 			HP:                     30 * ascensionLevel,
 			Recovery:               0,
 			CriticalDamageModifier: 0,
-			CriticalRate:           0.0005 * ascensionLevel,
+			CriticalRate:           0.00001 * ascensionLevel,
 			SkillProcRate:          0,
 			Evasion:                0,
-			Accuracy:               0,
-			TargetDefenseDecrease:  0.002 * ascensionLevel,
+			Accuracy:               0.000020002 * ascensionLevel,
+			TargetDefenseDecrease:  0.00002 * ascensionLevel,
 			SkillDamageModifier:    0,
-			DamageMitigation:       0.001 * ascensionLevel,
+			DamageMitigation:       0.00001 * ascensionLevel,
 		}
 		baseStats.AddStatModifier(ascensionStats)
 	}
