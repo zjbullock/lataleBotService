@@ -1801,9 +1801,7 @@ func (a *adventure) LockItem(id, item string) (*string, error) {
 	user.Inventory.Equipment[lockedItem]++
 	user.Inventory.Equipment[item]--
 	if user.Inventory.Equipment[item] == 0 {
-		newEquipment := user.Inventory.Equipment
-		delete(newEquipment, item)
-		user.Inventory.Equipment = newEquipment
+		delete(user.Inventory.Equipment, item)
 	}
 	_, err = a.users.UpdateDocument(user.ID, user)
 	if err != nil {
@@ -1830,9 +1828,7 @@ func (a *adventure) UnlockItem(id, lockedItem string) (*string, error) {
 	user.Inventory.Equipment[unLockedItem]++
 	user.Inventory.Equipment[lockedItem]--
 	if user.Inventory.Equipment[lockedItem] == 0 {
-		newEquipment := user.Inventory.Equipment
-		delete(newEquipment, lockedItem)
-		user.Inventory.Equipment = newEquipment
+		delete(user.Inventory.Equipment, lockedItem)
 	}
 	_, err = a.users.UpdateDocument(user.ID, user)
 	if err != nil {
