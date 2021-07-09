@@ -1710,7 +1710,7 @@ func (a *adventure) EquipBestItems(id string) (*string, error) {
 	}
 	equipmentItems := user.Inventory.Equipment
 	var itemList []models.Item
-	for item, _ := range equipmentItems {
+	for item := range equipmentItems {
 		if !strings.Contains(item, "[LOCKED]") {
 			queriedItem, err := a.item.QueryForDocument(&[]models.QueryArg{
 				{
@@ -3530,10 +3530,10 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 	if user.AscensionLevel > 0 {
 		ascensionLevel := float64(user.AscensionLevel)
 		ascensionStats := models.StatModifier{
-			MaxDPS:                 30 * ascensionLevel,
-			MinDPS:                 30 * ascensionLevel,
-			Defense:                2 * ascensionLevel,
-			HP:                     30 * ascensionLevel,
+			MaxDPS:                 50 * ascensionLevel,
+			MinDPS:                 50 * ascensionLevel,
+			Defense:                5 * ascensionLevel,
+			HP:                     50 * ascensionLevel,
 			Recovery:               0,
 			CriticalDamageModifier: 0,
 			CriticalRate:           0.00001 * ascensionLevel,
