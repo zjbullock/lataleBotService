@@ -1866,6 +1866,10 @@ func (a *adventure) EquipItem(id, item string) (*string, error) {
 		a.log.Errorf("error getting item with that name: %v", err)
 		return nil, err
 	}
+	if items == nil || items != nil && len(items) == 0 {
+		message := "Unable to find an item with that name.  Please check that the spelling on the name."
+		return &message, nil
+	}
 	equipment := items[0]
 	if equipment.Type.Type != "weapon" && equipment.Type.Type != "armor" {
 		message := fmt.Sprintf("That is a not a valid piece of equipment!  Ensure spelling and capitalization is correct.")
