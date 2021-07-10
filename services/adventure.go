@@ -1455,17 +1455,6 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
 		return nil, &message, nil
 	}
-
-	levelCap, err := a.levels.ReadDocument("levelCap")
-	if err != nil {
-		a.log.Errorf("error getting current level cap: %v", err)
-		return nil, nil, err
-	}
-	a.log.Debugf("levelCap: %v", levelCap)
-	if levelCap.Value <= area.LevelRange.Min {
-		levelRestriction := fmt.Sprintf("Area %v is currently inaccessible due to level cap restrictions!", areaId)
-		return &[]string{levelRestriction}, nil, nil
-	}
 	if user.Party != nil {
 		adventureLog, err := a.createPartyAdventureLog(user, area)
 		if err != nil {
@@ -1676,8 +1665,10 @@ func (a *adventure) SellItem(id, item string, quantity int, sellBoss bool) (*str
 		elyMade := int64(0)
 		for i := 0; i < quantity; i++ {
 			ely := *user.Ely
-			ely += int64(*itemData.Cost / 2)
-			elyMade += int64(*itemData.Cost / 2)
+			if itemData.Cost != nil {
+				ely += int64(*itemData.Cost / 2)
+				elyMade += int64(*itemData.Cost / 2)
+			}
 			user.Inventory.Equipment[itemData.Name]--
 			if user.Inventory.Equipment[itemData.Name] == 0 {
 				delete(user.Inventory.Equipment, itemData.Name)

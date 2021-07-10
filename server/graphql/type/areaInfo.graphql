@@ -2,5 +2,6 @@ type AreaInfo {
     Name: String!
     ID: String!
     LevelRange: LevelRangeInfo
+    AscensionRange: LevelRangeInfo
     Monsters: [MonsterInfo]!
 }

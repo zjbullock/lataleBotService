@@ -1,11 +1,12 @@
 package models
 
 type Area struct {
-	Name       string     `json:"name" firestore:"name"`
-	ID         string     `json:"id" firestore:"id"`
-	LevelRange LevelRange `json:"levelRange" firestore:"levelRange"`
-	Monsters   []Monster  `json:"monsters" firestore:"monsters"`
-	DropRange  LevelRange `json:"dropRange" firestore:"dropRange"`
+	Name           string      `json:"name" firestore:"name"`
+	ID             string      `json:"id" firestore:"id"`
+	LevelRange     LevelRange  `json:"levelRange" firestore:"levelRange"`
+	AscensionRange *LevelRange `json:"ascensionRange" firestore:"ascensionRange"`
+	Monsters       []Monster   `json:"monsters" firestore:"monsters"`
+	DropRange      LevelRange  `json:"dropRange" firestore:"dropRange"`
 }
 
 type LevelRange struct {

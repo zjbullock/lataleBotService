@@ -21,6 +21,13 @@ func (a *areaResolver) LevelRange(_ context.Context) *levelRangeResolver {
 	return &levelRangeResolver{levelRange: a.area.LevelRange}
 }
 
+func (a *areaResolver) AscensionRange(_ context.Context) *levelRangeResolver {
+	if a.area.AscensionRange != nil {
+		return &levelRangeResolver{levelRange: *a.area.AscensionRange}
+	}
+	return nil
+}
+
 func (a *areaResolver) Monsters(_ context.Context) []*monsterResolver {
 	var monsters []*monsterResolver
 	for _, monster := range a.area.Monsters {
