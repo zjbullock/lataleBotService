@@ -3389,10 +3389,10 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 					return &classItems[item]
 				}
 			}
-			if bossDropChance <= 0.8 {
+			if bossDropChance <= 0.9 {
 				var normalBossItems []models.Item
 				for _, equip := range items {
-					if equip.RequiredClasses == nil {
+					if equip.RequiredClasses == nil && equip.Type.Type == "armor" {
 						normalBossItems = append(normalBossItems, equip)
 					}
 				}
