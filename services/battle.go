@@ -92,6 +92,9 @@ func (b *battle) DetermineHit(randGenerator *rand.Rand, attackerName, defenderNa
 		}
 		damage -= damage * defender.DamageMitigation
 		defenderDefense := defender.Defense - (defender.Defense * attacker.TargetDefenseDecrease)
+		if defenderDefense < 0 {
+			defenderDefense = 0
+		}
 		roundedDamage = ((int(damage) - int(defenderDefense)) + int(math.Abs(damage-defenderDefense))) / 2
 
 		criticalChance := randGenerator.Float64()
