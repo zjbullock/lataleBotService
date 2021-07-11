@@ -3362,7 +3362,7 @@ func (a *adventure) checkGroupDeaths(users []*models.UserBlob, encounteredMonste
 }
 
 func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog []string, user *models.User, levelCap int32) (models.ClassInfo, []string, *models.User, error) {
-	if user.AscensionLevel == 0 && user.ClassMap[user.CurrentClass].Level < int32(200) {
+	if user.ClassMap[user.CurrentClass].Level < int32(200) {
 		a.log.Infof("ascension is in fact 0")
 		level, err := a.levels.ReadDocument(utils.ThirtyTwoBitIntToString(userClassInfo.Level))
 		if err != nil {
@@ -3455,7 +3455,7 @@ func (a *adventure) processLevelUps(userClassInfo models.ClassInfo, adventureLog
 			adventureLog = append(adventureLog, fmt.Sprintf("Current Exp: **%s/%s**", utils.String(userClassInfo.Exp), utils.String(level.Exp)))
 		}
 
-	} else if user.AscensionLevel > 0 {
+	} else if user.AscensionLevel > 0 && user.ClassMap[user.CurrentClass].Level == int32(200) {
 		ascensionLevel, err := a.ascension.ReadDocument(utils.ThirtyTwoBitIntToString(user.AscensionLevel))
 		if err != nil {
 			a.log.Errorf("error getting ascension level data: %v", err)
