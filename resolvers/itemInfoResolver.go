@@ -21,6 +21,10 @@ func (i *itemInfoResolver) LevelRequirement(_ context.Context) *float64 {
 	return i.item.LevelRequirement
 }
 
+func (i *itemInfoResolver) AscensionLevelRequirement(_ context.Context) *float64 {
+	return i.item.AscensionLevelRequirement
+}
+
 func (i *itemInfoResolver) Shop(_ context.Context) bool {
 	return i.item.Shop
 }

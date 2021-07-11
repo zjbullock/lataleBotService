@@ -2,6 +2,7 @@ input Item {
     Name: String!
     Type: ItemType!
     LevelRequirement: Float
+    AscensionLevelRequirement: Float
     Shop: Boolean!
     Boss: String
     Description: String

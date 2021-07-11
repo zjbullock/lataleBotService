@@ -2,6 +2,7 @@ type ItemInfo {
     Name: String!
     Type: ItemTypeInfo!
     LevelRequirement: Float
+    AscensionLevelRequirement: Float
     Boss: String
     Shop: Boolean!
     Description: String

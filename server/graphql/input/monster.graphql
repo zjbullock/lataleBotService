@@ -2,6 +2,7 @@ input Monster {
     Name: String!
     BossTitle: String
     Level: Float!
+    AscensionLevel: Float
     DropRange: LevelRange
     Exp: Float!
     Ely: Int!

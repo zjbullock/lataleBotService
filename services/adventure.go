@@ -162,7 +162,11 @@ func (a *adventure) GetBosses(id string) (*[]string, error) {
 	}
 	availableBosses = append(availableBosses, fmt.Sprintf("Boss Name:	|	Boss Bonus:	|	Level: "))
 	for _, boss := range *bosses {
-		availableBosses = append(availableBosses, fmt.Sprintf("%s	|	%s	|	%v", boss.Name, boss.BossBonus.Name, boss.Level))
+		if boss.AscensionLevel != nil && *boss.AscensionLevel < user.AscensionLevel {
+			availableBosses = append(availableBosses, fmt.Sprintf("%s	|	%s	|	⭐%v", boss.Name, boss.BossBonus.Name, *boss.AscensionLevel))
+		} else if boss.AscensionLevel == nil && boss.Level < user.ClassMap[user.CurrentClass].Level {
+			availableBosses = append(availableBosses, fmt.Sprintf("%s	|	%s	|	%v", boss.Name, boss.BossBonus.Name, boss.Level))
+		}
 	}
 	return &availableBosses, nil
 }
@@ -1781,14 +1785,14 @@ func (a *adventure) EquipBestItems(id string) (*string, error) {
 			var currentItem models.Item
 			json.Unmarshal(jsonBody, &currentItem)
 
-			if item.Type.Type == "armor" && *item.LevelRequirement > *currentItem.LevelRequirement {
+			if item.Type.Type == "armor" && (*item.LevelRequirement > *currentItem.LevelRequirement || item.AscensionLevelRequirement != nil && currentItem.AscensionLevelRequirement == nil || item.AscensionLevelRequirement != nil && currentItem.AscensionLevelRequirement != nil && *item.AscensionLevelRequirement > *currentItem.AscensionLevelRequirement) {
 
 				newUser, message := a.changeEquippedItem(&item, user)
 				if message != nil {
 					a.log.Infof(*message)
 				}
 				user = newUser
-			} else if item.Type.Type == "weapon" && *item.LevelRequirement > *currentItem.LevelRequirement {
+			} else if item.Type.Type == "weapon" && (*item.LevelRequirement > *currentItem.LevelRequirement || item.AscensionLevelRequirement != nil && currentItem.AscensionLevelRequirement == nil || item.AscensionLevelRequirement != nil && currentItem.AscensionLevelRequirement != nil && *item.AscensionLevelRequirement > *currentItem.AscensionLevelRequirement) {
 				newUser, message := a.changeEquippedItem(&item, user)
 				if message != nil {
 					a.log.Infof(*message)
@@ -1992,6 +1996,10 @@ func (a *adventure) EquipItem(id, item string) (*string, error) {
 	}
 	if user.ClassMap[user.CurrentClass].Level < int32(*equipment.LevelRequirement) {
 		message := fmt.Sprintf("User Level too low to equip the item.  Required Level: %v", int64(*equipment.LevelRequirement))
+		return &message, nil
+	}
+	if equipment.AscensionLevelRequirement != nil && user.AscensionLevel < int32(*equipment.AscensionLevelRequirement) {
+		message := fmt.Sprintf("User Ascension Level too low to equip the item.  Required Level: :star:%v", int64(*equipment.AscensionLevelRequirement))
 		return &message, nil
 	}
 	if items[0].RequiredClasses != nil && len(*items[0].RequiredClasses) > 0 {
@@ -2212,6 +2220,9 @@ func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, er
 		}
 		if boss.Level > partyMember.UserLevel {
 			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s level is lower than the required level of: %v", partyMember.User.Name, boss.Level))
+		}
+		if boss.AscensionLevel != nil && *boss.AscensionLevel > partyMember.User.AscensionLevel {
+			adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__'s level is lower than the required ascension level of:  :star:%v", partyMember.User.Name, *boss.AscensionLevel))
 		}
 	}
 	if len(coolDownLog) > 0 {
@@ -3550,6 +3561,9 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 				droppableItems = append(droppableItems, item)
 			}
 		}
+		if len(droppableItems) == 0 {
+			return nil
+		}
 		item := rand.Intn(len(droppableItems))
 		return &droppableItems[item]
 	}
@@ -3583,6 +3597,9 @@ func (a *adventure) getRandomItemDrop(currentWeapon string, dropRange models.Lev
 			if item.Boss == nil {
 				droppableItems = append(droppableItems, item)
 			}
+		}
+		if len(droppableItems) == 0 {
+			return nil
 		}
 		item := rand.Intn(len(droppableItems))
 		return &droppableItems[item]
@@ -3648,11 +3665,12 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 
 	if user.AscensionLevel > 0 {
 		ascensionLevel := float64(user.AscensionLevel)
+		ascensionLevel = 800
 		ascensionStats := models.StatModifier{
-			MaxDPS:                 50 * ascensionLevel,
-			MinDPS:                 50 * ascensionLevel,
-			Defense:                5 * ascensionLevel,
-			HP:                     50 * ascensionLevel,
+			MaxDPS:                 500 * ascensionLevel,
+			MinDPS:                 500 * ascensionLevel,
+			Defense:                10 * ascensionLevel,
+			HP:                     500 * ascensionLevel,
 			Recovery:               0,
 			CriticalDamageModifier: 0,
 			CriticalRate:           0.00001 * ascensionLevel,
