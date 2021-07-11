@@ -43,6 +43,9 @@ type Adventure interface {
 	GetItemInfo(itemName string) (*models.Item, *string, error)
 	GetUserInventory(id string) (*models.Inventory, *string, error)
 	GetShopInventory(id string) (*[]models.Item, error)
+	GetBankInventory(id string) (*models.Inventory, *string, error)
+	BankDeposit(id, item string) (*string, error)
+	BankWithdraw(id, item string) (*string, error)
 }
 
 type adventure struct {
@@ -56,13 +59,14 @@ type adventure struct {
 	party     repositories.PartyRepository
 	boss      repositories.BossRepository
 	item      repositories.ItemRepository
+	bank      repositories.BankRepository
 	setBonus  repositories.SetBonusRepository
 	battle    Battle
 	env       map[string]interface{}
 	log       loggo.Logger
 }
 
-func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, ascension repositories.AscensionRepository, config repositories.ConfigRepository, party repositories.PartyRepository, boss repositories.BossRepository, item repositories.ItemRepository, setBonus repositories.SetBonusRepository, env map[string]interface{}, log loggo.Logger) Adventure {
+func NewAdventureService(areas repositories.AreasRepository, classes repositories.ClassRepository, users repositories.UserRepository, equips repositories.EquipmentRepository, levels repositories.LevelRepository, ascension repositories.AscensionRepository, config repositories.ConfigRepository, party repositories.PartyRepository, boss repositories.BossRepository, item repositories.ItemRepository, bank repositories.BankRepository, setBonus repositories.SetBonusRepository, env map[string]interface{}, log loggo.Logger) Adventure {
 	return &adventure{
 		areas:     areas,
 		classes:   classes,
@@ -75,6 +79,7 @@ func NewAdventureService(areas repositories.AreasRepository, classes repositorie
 		battle:    NewBattleService(log),
 		boss:      boss,
 		item:      item,
+		bank:      bank,
 		setBonus:  setBonus,
 		env:       env,
 		log:       log,
@@ -1578,6 +1583,31 @@ func (a *adventure) GetUserInventory(id string) (*models.Inventory, *string, err
 	return &user.Inventory, nil, nil
 }
 
+func (a *adventure) GetBankInventory(id string) (*models.Inventory, *string, error) {
+	bank, err := a.bank.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("error getting user bank: %v", err)
+		if bank == nil {
+			_, err := a.bank.InsertDocument(id, &models.Inventory{
+				Equipment: make(map[string]int),
+				Consume:   make(map[string]int),
+				Event:     make(map[string]int),
+			})
+			if err != nil {
+				a.log.Errorf("error getting bank for user: %s", id)
+				return nil, nil, err
+			}
+			return &models.Inventory{
+				Equipment: make(map[string]int),
+				Consume:   make(map[string]int),
+				Event:     make(map[string]int),
+			}, nil, nil
+		}
+	}
+
+	return bank, nil, nil
+}
+
 func (a *adventure) BuyItem(id, item string) (*string, error) {
 	user, err := a.users.ReadDocument(id)
 	if err != nil {
@@ -1774,6 +1804,100 @@ func (a *adventure) EquipBestItems(id string) (*string, error) {
 		return &failMessage, nil
 	}
 	message := fmt.Sprintf("Successfully equipped user with the highest level equipment found in their inventory!")
+	return &message, nil
+}
+
+func (a *adventure) BankDeposit(id, item string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("problem reading userInfo: %v", err)
+		message := "You must first choose a class and get started!"
+		return &message, nil
+	}
+	if user.Inventory.Equipment != nil && user.Inventory.Equipment[item] == 0 {
+		message := "You do not appear to possess an %s in your inventory!"
+		return &message, nil
+	}
+	bank, err := a.bank.ReadDocument(id)
+	if err != nil {
+		newEquipInventory := make(map[string]int)
+		newEquipInventory[item]++
+		_, err := a.bank.InsertDocument(id, &models.Inventory{
+			Equipment: newEquipInventory,
+			Consume:   make(map[string]int),
+			Event:     make(map[string]int),
+		})
+		if err != nil {
+			message := "no bank found, attempted to create one, but failed"
+			return &message, nil
+		}
+		message := fmt.Sprintf("Successfully inserted **%v** **%s**(s) into your bank inventory!", 1, item)
+		return &message, nil
+	}
+	if len(bank.Equipment) < 45 {
+		bank.Equipment[item]++
+		_, err = a.bank.UpdateDocument(id, bank)
+		if err != nil {
+			a.log.Errorf("error updating bank for %s: %v", id, err)
+			return nil, err
+		}
+		user.Inventory.Equipment[item]--
+		if user.Inventory.Equipment[item] == 0 {
+			delete(user.Inventory.Equipment, item)
+		}
+		_, err := a.users.UpdateDocument(id, user)
+		if err != nil {
+			a.log.Errorf("error updating user %s with: %v", id, err)
+			return nil, err
+		}
+		message := fmt.Sprintf("Successfully inserted **%v** **%s**(s) into your bank inventory!", 1, item)
+		return &message, nil
+	}
+	message := "Maximum bank capacity of 45 unique items reached!"
+	return &message, nil
+}
+
+func (a *adventure) BankWithdraw(id, item string) (*string, error) {
+	user, err := a.users.ReadDocument(id)
+	if err != nil {
+		a.log.Errorf("problem reading userInfo: %v", err)
+		message := "You must first choose a class and get started!"
+		return &message, nil
+	}
+	bank, err := a.bank.ReadDocument(id)
+	if err != nil {
+		_, err := a.bank.InsertDocument(id, &models.Inventory{
+			Equipment: make(map[string]int),
+			Consume:   make(map[string]int),
+			Event:     make(map[string]int),
+		})
+		if err != nil {
+			message := "no bank found, attempted to create one, but failed"
+			return &message, nil
+		}
+		message := "Created a bank, as you have not opened one yet!"
+		return &message, nil
+	}
+	if len(user.Inventory.Equipment) < 45 {
+		bank.Equipment[item]--
+		if bank.Equipment[item] == 0 {
+			delete(bank.Equipment, item)
+		}
+		_, err = a.bank.UpdateDocument(id, bank)
+		if err != nil {
+			a.log.Errorf("error updating bank for %s: %v", id, err)
+			return nil, err
+		}
+		user.Inventory.Equipment[item]++
+		_, err := a.users.UpdateDocument(id, user)
+		if err != nil {
+			a.log.Errorf("error updating user %s with: %v", id, err)
+			return nil, err
+		}
+		message := fmt.Sprintf("Successfully inserted **%v** **%s**(s) into your inventory!", 1, item)
+		return &message, nil
+	}
+	message := "Maximum inventory capacity of 45 unique items reached!"
 	return &message, nil
 }
 

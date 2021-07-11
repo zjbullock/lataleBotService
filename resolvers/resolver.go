@@ -183,6 +183,37 @@ func (r *Resolver) SellAllItems(ctx context.Context, args struct {
 	return &finishedSelling, nil
 }
 
+func (r *Resolver) GetBankInventory(ctx context.Context, args struct{ Id string }) (*inventoryResponseResolver, error) {
+	inventory, message, err := r.Services.Adventure.GetBankInventory(args.Id)
+	if err != nil {
+		r.Log.Errorf("error getting user inventory: %v", err)
+		return nil, err
+	}
+	return &inventoryResponseResolver{inventory: inventory, message: message}, nil
+}
+
+func (r *Resolver) BankDeposit(ctx context.Context, args struct {
+	Id, Name string
+}) (*string, error) {
+	message, err := r.Services.Adventure.BankDeposit(args.Id, strings.TrimSpace(args.Name))
+	if err != nil {
+		r.Log.Errorf("error locking specified item")
+		return nil, err
+	}
+	return message, err
+}
+
+func (r *Resolver) BankWithdraw(ctx context.Context, args struct {
+	Id, Name string
+}) (*string, error) {
+	message, err := r.Services.Adventure.BankWithdraw(args.Id, strings.TrimSpace(args.Name))
+	if err != nil {
+		r.Log.Errorf("error locking specified item")
+		return nil, err
+	}
+	return message, err
+}
+
 func (r *Resolver) LockItem(ctx context.Context, args struct {
 	Id, Name string
 }) (*string, error) {

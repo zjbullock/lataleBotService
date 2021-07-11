@@ -11,6 +11,8 @@ type Mutation {
     SellAllItems(id: String!, boss: Boolean!): String
     LockItem(id: String!, name: String!): String
     UnlockItem(id: String!, name: String!): String
+    BankDeposit(id: String!, name: String!): String
+    BankWithdraw(id: String!, name: String!): String
     AddLevelTable(levels: [LevelInput!]!): [Level]!
     AddAscensionTable: [Level]!
     AddNewParty(id: String!): String
