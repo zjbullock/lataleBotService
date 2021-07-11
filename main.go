@@ -64,6 +64,7 @@ func init() {
 		party     repositories.PartyRepository
 		boss      repositories.BossRepository
 		item      repositories.ItemRepository
+		bank      repositories.BankRepository
 		setBonus  repositories.SetBonusRepository
 	}{
 		area:      repositories.NewAreaRepo(l, ds),
@@ -76,6 +77,7 @@ func init() {
 		party:     repositories.NewPartiesRepo(l, ds),
 		boss:      repositories.NewBossRepository(l, ds),
 		item:      repositories.NewItemRepo(l, ds),
+		bank:      repositories.NewBankRepo(l, ds),
 		setBonus:  repositories.NewSetBonusRepo(l, ds),
 	}
 	service := struct {
@@ -83,7 +85,7 @@ func init() {
 		Manage    services.Manage
 		Damage    services.Battle
 	}{
-		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.ascension, repos.config, repos.party, repos.boss, repos.item, repos.setBonus, configMap, l),
+		Adventure: services.NewAdventureService(repos.area, repos.classes, repos.user, repos.equips, repos.levels, repos.ascension, repos.config, repos.party, repos.boss, repos.item, repos.bank, repos.setBonus, configMap, l),
 		Manage:    services.NewManageService(repos.area, repos.levels, repos.ascension, repos.classes, repos.user, repos.equips, repos.config, repos.boss, repos.item, repos.setBonus, l),
 		Damage:    services.NewBattleService(l),
 	}
