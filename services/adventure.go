@@ -1819,7 +1819,7 @@ func (a *adventure) BankDeposit(id, item string) (*string, error) {
 		return &message, nil
 	}
 	if user.Inventory.Equipment != nil && user.Inventory.Equipment[item] == 0 {
-		message := "You do not appear to possess an %s in your inventory!"
+		message := "You do not appear to possess a %s in your inventory!"
 		return &message, nil
 	}
 	bank, err := a.bank.ReadDocument(id)
@@ -1880,6 +1880,10 @@ func (a *adventure) BankWithdraw(id, item string) (*string, error) {
 			return &message, nil
 		}
 		message := "Created a bank, as you have not opened one yet!"
+		return &message, nil
+	}
+	if bank.Equipment[item] == 0 {
+		message := fmt.Sprintf("You do not possess a %s in your bank.", item)
 		return &message, nil
 	}
 	if len(user.Inventory.Equipment) < 45 {
