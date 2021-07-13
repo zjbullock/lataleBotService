@@ -3662,7 +3662,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		SkillProcRate:          getStaticStat(0.25, levelModifier, class.SkillProcRate) + bossSkillProc,
 		Evasion:                getStaticStat(0.05, levelModifier, class.Evasion) + bossEvasion,
 		Accuracy:               0.85*class.Accuracy + bossAccuracy,
-		TargetDefenseDecrease:  class.TargetDefenseDecrease + bossTdd,
+		TargetDefenseDecrease:  a.getDiminishingStat(0, class.TargetDefenseDecrease),
 		SkillDamageModifier:    class.SkillDamageModifier + bossSkillDmg,
 		DamageMitigation:       class.DamageMitigation + bossDamageMit,
 	}
@@ -3693,6 +3693,7 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		a.log.Errorf("error getting stats from gear: %v", err)
 		return nil, err
 	}
+	baseStats.TargetDefenseDecrease = a.getDiminishingStat(baseStats.TargetDefenseDecrease, bossTdd)
 	baseStats.AddStatModifier(*gearStats)
 	if user.ClassMap[user.CurrentClass].SetBonuses != nil && len(user.ClassMap[user.CurrentClass].SetBonuses) > 0 {
 		for _, bonus := range user.ClassMap[user.CurrentClass].SetBonuses {
@@ -3702,6 +3703,12 @@ func (a *adventure) calculateBaseStat(user models.User, class models.StatModifie
 		}
 	}
 	return &baseStats, nil
+}
+
+func (a *adventure) getDiminishingStat(statTotal, addedStat float64) float64 {
+	diminishedStat := 1.0 - statTotal
+	diminishedStat *= addedStat
+	return statTotal + diminishedStat
 }
 
 func (a *adventure) getStatsFromGear(equips *models.Equipment) (*models.StatModifier, error) {
