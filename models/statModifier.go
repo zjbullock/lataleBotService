@@ -46,7 +46,8 @@ func (s *StatModifier) AddStatModifier(stat StatModifier) {
 	s.SkillProcRate += stat.SkillProcRate
 	s.Recovery += stat.Recovery
 	s.SkillDamageModifier += stat.SkillDamageModifier
-	s.TargetDefenseDecrease += stat.TargetDefenseDecrease
+	diminishedTdd := 1.0 - s.TargetDefenseDecrease
+	s.TargetDefenseDecrease += stat.TargetDefenseDecrease * diminishedTdd
 	s.DamageMitigation += stat.DamageMitigation
 }
 
