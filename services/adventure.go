@@ -254,7 +254,7 @@ func (a *adventure) CreateParty(id string) (*string, error) {
 		return &message, nil
 	}
 	if checkIfInParty != nil {
-		message := fmt.Sprintf("You are currently in a party!  To leave your current party, first run **/latale leaveparty**.")
+		message := fmt.Sprintf("You are currently in a party!  To leave your current party, first run **/latale party leave**.")
 		return &message, nil
 	}
 	checkIfPartyLeader, err := a.party.QueryDocuments(&[]models.QueryArg{
@@ -269,7 +269,7 @@ func (a *adventure) CreateParty(id string) (*string, error) {
 		return &message, nil
 	}
 	if checkIfPartyLeader != nil {
-		message := fmt.Sprintf("You are currently the leader of a party!  To disband your current party, first run **/latale leaveparty**.")
+		message := fmt.Sprintf("You are currently the leader of a party!  To disband your current party, first run **/latale party leave**.")
 		return &message, nil
 	}
 	//3.  If user is not currently in a party, create a new party.
@@ -290,7 +290,7 @@ func (a *adventure) CreateParty(id string) (*string, error) {
 		message := fmt.Sprintf("A problem was encountered creating a party.  Sorry for the inconvenience")
 		return &message, nil
 	}
-	message := fmt.Sprintf("**Congratulations**, your party has been created!\nPlease have members join your party by using the \"***/latale joinparty partycode:%s***\" command to NiceHat.\nTo keep players you do not want to join the party from using the command, please do not post the command publicly", *partyId)
+	message := fmt.Sprintf("**Congratulations**, your party has been created!\nPlease have members join your party by using the \"***/latale party join partycode:%s***\" command to NiceHat.\nTo keep players you do not want to join the party from using the command, please do not post the command publicly", *partyId)
 	return &message, nil
 }
 
@@ -360,7 +360,7 @@ func (a *adventure) JoinParty(partyId, id string) (*string, error) {
 		message := fmt.Sprintf("A problem was encountered creating a party.  Sorry for the inconvenience")
 		return &message, nil
 	}
-	message := fmt.Sprintf("You have successfully been added to the party!  To leave the party in the future, simply run the command **/latale leaveparty**")
+	message := fmt.Sprintf("You have successfully been added to the party!  To leave the party in the future, simply run the command **/latale party leave**")
 	return &message, nil
 }
 
@@ -2209,7 +2209,7 @@ func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, er
 		return nil, &message, nil
 	}
 	if user.Party == nil {
-		message := "You must be in a party to participate in Boss Fights!  Join a party, or create one using `/latale createparty`."
+		message := "You must be in a party to participate in Boss Fights!  Join a party, or create one using `/latale party create`."
 		return nil, &message, nil
 	}
 	boss, err := a.boss.ReadDocument(bossId)
