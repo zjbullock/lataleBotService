@@ -135,18 +135,11 @@ func (a *adventure) GetSetBonus(id string) (*models.SetBonus, error) {
 
 func (a *adventure) GetBosses(id string) (*[]string, error) {
 	var availableBosses []string
-	user, err := a.users.ReadDocument(id)
-	if err != nil {
-		a.log.Errorf("error getting user info: %v", err)
-		message := "User has not created an account yet."
-		availableBosses = append(availableBosses, message)
-		return &availableBosses, nil
-	}
 	bosses, err := a.boss.QueryDocuments(&[]models.QueryArg{
 		{
 			Path:  "level",
-			Op:    "<=",
-			Value: user.ClassMap[user.CurrentClass].Level,
+			Op:    ">=",
+			Value: 0,
 		},
 	})
 	if err != nil {
@@ -160,11 +153,10 @@ func (a *adventure) GetBosses(id string) (*[]string, error) {
 		availableBosses = append(availableBosses, message)
 		return &availableBosses, nil
 	}
-	availableBosses = append(availableBosses, fmt.Sprintf("Boss Name:	|	Boss Bonus:	|	Level: "))
 	for _, boss := range *bosses {
-		if boss.AscensionLevel != nil && *boss.AscensionLevel < user.AscensionLevel {
+		if boss.AscensionLevel != nil {
 			availableBosses = append(availableBosses, fmt.Sprintf("%s	|	%s	|	⭐%v", boss.Name, boss.BossBonus.Name, *boss.AscensionLevel))
-		} else if boss.AscensionLevel == nil && boss.Level < user.ClassMap[user.CurrentClass].Level {
+		} else if boss.AscensionLevel == nil {
 			availableBosses = append(availableBosses, fmt.Sprintf("%s	|	%s	|	%v", boss.Name, boss.BossBonus.Name, boss.Level))
 		}
 	}
@@ -2256,7 +2248,7 @@ func (a *adventure) determineBossBonusDrop(userName string, userClassInfo models
 		if userClassInfo.BossBonuses == nil {
 			userClassInfo.BossBonuses = make(map[string]*models.BossBonus)
 		}
-		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained the ability __**%s**__ for defeating __**%s**__ on their current class!", userName, boss.BossBonus.Name, boss.Name))
+		adventureLog = append(adventureLog, fmt.Sprintf("__**%s**__ gained the boss bonus __**%s**__ for defeating __**%s**__ on their current class!", userName, boss.BossBonus.Name, boss.Name))
 		userClassInfo.BossBonuses[boss.Name] = boss.BossBonus
 	}
 	return userClassInfo, adventureLog
