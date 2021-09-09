@@ -2549,12 +2549,12 @@ func (a *adventure) createAdventureLog(users []*models.UserBlob, monster models.
 		users[0].User.ClassMap[users[0].User.CurrentClass] = &newUserClassInfo
 		users[0].User.AscensionExp = newUser.AscensionExp
 		users[0].User.AscensionLevel = newUser.AscensionLevel
+		users[0].User.LastActionTime = time.Now()
+		//TODO: DISABLE WHEN RUNNING LOCAL
+		_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
 	} else {
 		adventureLog = append(adventureLog, fmt.Sprintf("**---------------------------- %s LOST THE BATTLE. ----------------------------**", users[0].User.Name))
 	}
-	users[0].User.LastActionTime = time.Now()
-	//TODO: DISABLE WHEN RUNNING LOCAL
-	_, err = a.users.UpdateDocument(users[0].User.ID, users[0].User)
 	if err != nil {
 		a.log.Errorf("failed to update user doc with error: %v", err)
 		return adventureLog, nil
