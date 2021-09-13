@@ -1460,7 +1460,7 @@ func (a *adventure) GetAdventure(areaId, userId string) (*[]string, *string, err
 	area, err := a.areas.ReadDocument(areaId)
 	if err != nil {
 		a.log.Errorf("error getting area info: %v", err)
-		message := "Could not find an area with that code.  Please be sure to use the codes specified in **-areas**."
+		message := "Could not find an area with that code.  Please be sure to use the codes specified in `/latale adventure arealist`."
 		return nil, &message, nil
 	}
 	if user.Party != nil {
@@ -2207,7 +2207,7 @@ func (a *adventure) GetBossBattle(bossId, userId string) (*[]string, *string, er
 	boss, err := a.boss.ReadDocument(bossId)
 	if err != nil {
 		a.log.Errorf("error getting area info: %v", err)
-		message := "Could not find a boss with that name.  Please be sure to use the names specified in **-bosses**."
+		message := "Could not find a boss with that name.  Please be sure to use the names specified in `/latale boss list`."
 		return nil, &message, nil
 	}
 	partyMembers, err := a.generatePartyBlob(user)
