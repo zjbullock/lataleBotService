@@ -42,7 +42,7 @@ jobs:
 
     # Optional subfolder directory to save the json file.
     - name: Google Cloud Platform (GCP) CLI - gcloud
-      uses: actions-hub/gcloud@272.0.0
+      uses: actions-hub/gcloud@420.0.0
       env:
         # Project id
         PROJECT_ID: ${{ secrets.GOOGLE_APPLICATION_PROJECT_ID_PROD }}
