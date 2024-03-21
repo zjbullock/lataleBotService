@@ -5,4 +5,3 @@ env: flex
 
 runtime_config:
   operating_system: "ubuntu22"
-env: standard
