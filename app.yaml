@@ -1,6 +1,7 @@
 # app.yaml
 service: latale-bot
 runtime_config:
-  operating_system: "ubuntu22"
-  runtime_version: "1.22"
+  runtime: go
+  operating_system: ubuntu22
+  runtime_version: '1.22'
 env: standard
