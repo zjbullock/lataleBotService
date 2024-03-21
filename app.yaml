@@ -2,6 +2,6 @@
 service: latale-bot
 runtime: go
 runtime_config:
-  operating_system: ubuntu22
-  runtime_version: '1.22'
+  operating_system: "ubuntu22"
+  runtime_version: "1.22"
 env: standard
